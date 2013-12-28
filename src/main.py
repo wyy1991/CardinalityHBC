@@ -3,29 +3,42 @@
 
 import select
 import socket
+import random
 import sys
 
+from random import randint
 
-#--------main function-----------------------------------------------------
-def main():
-    
+#--------create socket-----------------------------------------------------
+def createSocket():
+    newsocket = None
     host = ''
-    port = 50000
-    backlog = 5
+    port = 50000 + randint(1,1000)
     size = 1024
     
     # create socket
-    netsocket = None
     try:
-        netsocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        netsocket.bind((host,port))
-        print netsocket.getsockname()
+        newsocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        newsocket.bind((host,port))
+        print newsocket.getsockname()
     except socket.error, (code,message):
-        if netsocket:
-            netsocket.close()
+        if newsocket:
+            newsocket.close()
         print "Could not open socket: " + message
         sys.exit(1)
         
+    return newsocket
+
+#--------isFirstNode-----------------------------------------------------
+def isFirstNode():
+    if len(sys.argv) <= 1:
+        return False
+    elif sys.argv[1] == "first":
+        print "This is node One!"
+        return True
+#--------main function-----------------------------------------------------
+def main():
+    isNodeOne = isFirstNode()
+    netsocket = createSocket()
     # loop through sockets
     input = [netsocket,sys.stdin]
     running = True
