@@ -5,8 +5,9 @@ import select
 import socket
 import random
 import sys
-from urllib import urlopen
+import json
 import re
+from urllib import urlopen
 from random import randint
 
 #--------create socket-----------------------------------------------------
@@ -41,6 +42,33 @@ def isFirstNode():
     elif sys.argv[1] == "first":
         print "This is node One!"
         return True
+#--------enterFirstNodeAddr-----------------------------------------------------
+def enterFirstNodeAddr(peerDic):
+    # ask for node one address
+    waitForFirstNode = True
+    while waitForFirstNode:
+        print "Please enter address of node one, x.x.x.x:xxxx"
+        sys.stdout.write("%")
+        addrIn = sys.stdin.readline()
+        addrInList = addrIn.rstrip('\n').split(":")
+        # check if input valid
+        if 2 != len(addrInList):
+            print "Invalid address!"
+        elif 4 != len(addrInList[0].split(".")):
+            print "Invalid ip!"
+        else:
+            peerDic[1] = [addrInList[0], int(addrInList[1])] 
+            # insert the address to peerlist
+            waitForFirstNode = False
+    return peerDic
+#--------create message-----------------------------------------------------
+def createConnectFirstNodeMsg(originIP, originPort):
+    msgDic = {'Origin':[originIP, originPort],
+              'JoinRequest':1}
+    msgStr=json.dumps(msgDic)
+    return msgStr
+
+
 #--------main function-----------------------------------------------------
 def main():
     size = 1024
@@ -57,24 +85,13 @@ def main():
         myNodeNum = 1
         peerDic[1] = [myip, myport]
     else:
-        # ask for node one address
-        waitForFirstNode = True
-        while waitForFirstNode:
-            print "Please enter address of node one, x.x.x.x:xxxx"
-            sys.stdout.write("%")
-            addrIn = sys.stdin.readline()
-            addrInList = addrIn.rstrip('\n').split(":")
-            # check if input valid
-            if 2 != len(addrInList):
-                print "Invalid address!"
-            elif 4 != len(addrInList[0].split(".")):
-                print "Invalid ip!"
-            else:
-                peerDic[1] = [addrInList[0], int(addrInList[1])] 
-                # insert the address to peerlist
-                waitForFirstNode = False
-        # check if this is an valid address
-        
+        peerDic = enterFirstNodeAddr(peerDic)
+        print peerDic
+        # create messagef 
+        joinmsg = createConnectFirstNodeMsg(myip, myport)
+        # send message to first node
+        print peerDic[1][0]
+        netsocket.sendto(joinmsg,(peerDic[1][0], peerDic[1][1]))
         
         
     
