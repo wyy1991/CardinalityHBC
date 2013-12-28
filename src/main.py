@@ -10,6 +10,11 @@ import re
 from urllib import urlopen
 from random import randint
 
+#-----Global variables-----------------------------------------------------
+netsocket = None
+peerDic = {}
+myNodeNum = 0
+
 #--------create socket-----------------------------------------------------
 def createSocket():
     newsocket = None
@@ -43,7 +48,8 @@ def isFirstNode():
         print "This is node One!"
         return True
 #--------enterFirstNodeAddr-----------------------------------------------------
-def enterFirstNodeAddr(peerDic):
+def enterFirstNodeAddr():
+    global peerDic
     # ask for node one address
     waitForFirstNode = True
     while waitForFirstNode:
@@ -57,42 +63,63 @@ def enterFirstNodeAddr(peerDic):
         elif 4 != len(addrInList[0].split(".")):
             print "Invalid ip!"
         else:
-            peerDic[1] = [addrInList[0], int(addrInList[1])] 
+            peerDic[1] = (addrInList[0], int(addrInList[1])) 
             # insert the address to peerlist
             waitForFirstNode = False
     return peerDic
-#--------create message-----------------------------------------------------
+#--------createConnectFirstNodeMsg-----------------------------------------------------
 def createConnectFirstNodeMsg(originIP, originPort):
     msgDic = {'Origin':[originIP, originPort],
               'Join':1}
     msgStr=json.dumps(msgDic)
     return msgStr
 
-def processJoinMsg(origin_addr, peerDict):
+#--------createConnectFirstNodeMsg-----------------------------------------------------
+def createRplyNodeNumMsg(n):
+    msgDic = {'NodeNum':n,
+              'OriginNum':1}
+    msgStr=json.dumps(msgDic)
+    return msgStr
+#--------processJoinMsg-----------------------------------------------------
+def processJoinMsg(origin_addr):
+    global peerDic
     originInList = False
-    for number, address in peerDict.items() :
+    for number, address in peerDic.items() :
         if address == origin_addr:
             originInList = True
     if originInList == False:
         # insert origin into peerDict
-        peerDict[len(peerDict)] = [origin_addr[0], origin_addr[1]]
-        print "Insert peer."
-    return peerDict
-    
-    
+        newNodeNum =len(peerDic)
+        peerDic[newNodeNum] = [origin_addr[0], origin_addr[1]]
+        print "Insert peer No.", newNodeNum
+        rplyNodeNumMsg = createRplyNodeNumMsg(newNodeNum)
+        netsocket.sendto(rplyNodeNumMsg, origin_addr)
 
-def processPendingMsg(rawmsg, origin_addr, peerDict):
+#--------processRplyNodeNumMsg-----------------------------------------------------
+def processRplyNodeNumMsg(msgdict):
+    global myNodeNum
+    # set my node number 
+    if 0==myNodeNum and 1==int(msgdict['OriginNum']):
+        myNodeNum = int(msgdict['NodeNum'])
+        print "My node num is :", myNodeNum
+        
+#--------processPendingMsg-----------------------------------------------------    
+def processPendingMsg(rawmsg, origin_addr):
     print "recieved from address", origin_addr
     msgdict = json.loads(str(rawmsg))  # @@@ json to dictionary
     
-    if 'Join' in msgdict:
-        peerDict = processJoinMsg(origin_addr, peerDict)
-    
-    #check if exist
-    return peerDict
+    if 'Join' in msgdict and 1 == myNodeNum:
+        processJoinMsg(origin_addr)
+    if 'NodeNum' in msgdict and 'OriginNum' in msgdict:
+        processRplyNodeNumMsg(msgdict)
+   
 
 #--------main function-----------------------------------------------------
 def main():
+    global netsocket
+    global peerDic
+    global myNodeNum
+    
     iamNodeOne = isFirstNode()
     size = 1024
     # create socket
@@ -102,11 +129,11 @@ def main():
     print "Address:", myip, ":", myport
     
     # <peer number, address>
-    peerDic ={ 0 : [myip, myport] } # key 0, stores my address
+    peerDic[0] = (myip, myport) # key 0, stores my address
     myNodeNum = 0;
     if iamNodeOne:
         myNodeNum = 1
-        peerDic[1] = [myip, myport]
+        peerDic[1] = (myip, myport)
     else:
         peerDic = enterFirstNodeAddr(peerDic)
         print peerDic
