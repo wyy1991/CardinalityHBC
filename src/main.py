@@ -17,23 +17,22 @@ myNodeNum = 0
 
 #--------create socket-----------------------------------------------------
 def createSocket():
-    newsocket = None
+    global netsocket
     host = ''
     port = 50000 + randint(1,1000)
 
     
     # create socket
     try:
-        newsocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        newsocket.bind((host,port))
+        netsocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        netsocket.bind((host,port))
         #print newsocket.getsockname()
     except socket.error, (code,message):
-        if newsocket:
-            newsocket.close()
+        if netsocket:
+            netsocket.close()
         print "Could not open socket: " + message
         sys.exit(1)
         
-    return newsocket
 #--------getPublicIP-----------------------------------------------------
 def getPublicIp():
     data = str(urlopen('http://checkip.dyndns.com/').read())  #@@@ my have problem
@@ -98,9 +97,12 @@ def processJoinMsg(origin_addr):
 #--------processRplyNodeNumMsg-----------------------------------------------------
 def processRplyNodeNumMsg(msgdict):
     global myNodeNum
+    global peerDic
     # set my node number 
     if 0==myNodeNum and 1==int(msgdict['OriginNum']):
         myNodeNum = int(msgdict['NodeNum'])
+        #insert into peerdic
+        peerDic[myNodeNum] = peerDic[0]
         print "My node num is :", myNodeNum
         
 #--------processPendingMsg-----------------------------------------------------    
@@ -123,8 +125,9 @@ def main():
     iamNodeOne = isFirstNode()
     size = 1024
     # create socket
-    netsocket = createSocket()
-    myip = getPublicIp()
+    createSocket()
+    #myip = getPublicIp()
+    myip = netsocket.getsockname()[0] 
     myport = netsocket.getsockname()[1] 
     print "Address:", myip, ":", myport
     
@@ -135,7 +138,7 @@ def main():
         myNodeNum = 1
         peerDic[1] = (myip, myport)
     else:
-        peerDic = enterFirstNodeAddr(peerDic)
+        peerDic = enterFirstNodeAddr()
         print peerDic
         # create message
         joinmsg = createConnectFirstNodeMsg(myip, myport)
@@ -166,7 +169,7 @@ def main():
                     data,address = netsocket.recvfrom(size)
                     print "received" + data
                     # got pending msg
-                    peerDic = processPendingMsg(data, address, peerDic)
+                    processPendingMsg(data, address)
                     print peerDic
                     
                 except socket.error, (code,message):
