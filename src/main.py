@@ -64,16 +64,32 @@ def enterFirstNodeAddr(peerDic):
 #--------create message-----------------------------------------------------
 def createConnectFirstNodeMsg(originIP, originPort):
     msgDic = {'Origin':[originIP, originPort],
-              'JoinRequest':1}
+              'Join':1}
     msgStr=json.dumps(msgDic)
     return msgStr
 
+def processJoinMsg(origin_addr, peerDict):
+    originInList = False
+    for number, address in peerDict.items() :
+        if address == origin_addr:
+            originInList = True
+    if originInList == False:
+        # insert origin into peerDict
+        peerDict[len(peerDict)] = [origin_addr[0], origin_addr[1]]
+        print "Insert peer."
+    return peerDict
+    
+    
 
-def processPendingMsg(rawmsg, origin_addr):
+def processPendingMsg(rawmsg, origin_addr, peerDict):
     print "recieved from address", origin_addr
-    msgdict = json.loads(str(rawmsg))[0]  # @@@ json to dictionary
-    print msgdict
-    return 0
+    msgdict = json.loads(str(rawmsg))  # @@@ json to dictionary
+    
+    if 'Join' in msgdict:
+        peerDict = processJoinMsg(origin_addr, peerDict)
+    
+    #check if exist
+    return peerDict
 
 #--------main function-----------------------------------------------------
 def main():
@@ -123,7 +139,8 @@ def main():
                     data,address = netsocket.recvfrom(size)
                     print "received" + data
                     # got pending msg
-                    processPendingMsg(data, address)
+                    peerDic = processPendingMsg(data, address, peerDic)
+                    print peerDic
                     
                 except socket.error, (code,message):
                     print "Error: socket broken: " + message
