@@ -69,8 +69,15 @@ def createConnectFirstNodeMsg(originIP, originPort):
     return msgStr
 
 
+def processPendingMsg(rawmsg, origin_addr):
+    print "recieved from address" + origin_addr
+    msgdict = json.loads(rawmsg)
+    print msgdict
+    return 0
+
 #--------main function-----------------------------------------------------
 def main():
+    iamNodeOne = isFirstNode()
     size = 1024
     # create socket
     netsocket = createSocket()
@@ -81,16 +88,15 @@ def main():
     # <peer number, address>
     peerDic ={ 0 : [myip, myport] } # key 0, stores my address
     myNodeNum = 0;
-    if True == isFirstNode():
+    if iamNodeOne:
         myNodeNum = 1
         peerDic[1] = [myip, myport]
     else:
         peerDic = enterFirstNodeAddr(peerDic)
         print peerDic
-        # create messagef 
+        # create message
         joinmsg = createConnectFirstNodeMsg(myip, myport)
         # send message to first node
-        print peerDic[1][0]
         netsocket.sendto(joinmsg,(peerDic[1][0], peerDic[1][1]))
         
         
@@ -98,6 +104,9 @@ def main():
     # if not, ask for input of node one address
     # connect to node one, and get node number back
     
+    if iamNodeOne:
+        print "Waiting for other nodes to join..."
+        print "Enter s to stop waiting and start. Enter q to quit."
     
     # loop through sockets
     input = [netsocket,sys.stdin]
@@ -112,9 +121,10 @@ def main():
                 # handle the netsocket socket
                 try:
                     data,address = netsocket.recvfrom(size)
-                    print "recieved:" + data
-                    netsocket.sendto(data,address)
-                    print "send:" + data
+                    # got pending msg
+                    processPendingMsg(data, address)
+                    
+                 
                 except:
                     running = False
     
@@ -124,6 +134,9 @@ def main():
                 
                 if textin == "q\n":
                     running = False
+                elif textin == "s\n":
+                    #@@@ to do start computing
+                    next = 0 #@@@ to do
                 else:
                     #netsocket.sendto(textin,(host,port)) 
                     running = True
