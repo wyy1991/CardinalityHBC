@@ -30,7 +30,7 @@ def createSocket():
     return newsocket
 #--------getPublicIP-----------------------------------------------------
 def getPublicIp():
-    data = str(urlopen('http://checkip.dyndns.com/').read())
+    data = str(urlopen('http://checkip.dyndns.com/').read())  #@@@ my have problem
     # data = '<html><head><title>Current IP Check</title></head><body>Current IP Address: 65.96.168.198</body></html>\r\n'
 
     return re.compile(r'Address: (\d+\.\d+\.\d+\.\d+)').search(data).group(1)
@@ -48,18 +48,35 @@ def main():
     netsocket = createSocket()
     myip = getPublicIp()
     myport = netsocket.getsockname()[1] 
+    print "Address:", myip, ":", myport
     
+    # <peer number, address>
+    peerDic ={ 0 : [myip, myport] } # key 0, stores my address
     myNodeNum = 0;
     if True == isFirstNode():
         myNodeNum = 1
-    # if node one, show global address
-    '''
-    s1 = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    s1.connect(("gmail.com",80))
-    print(s1.getsockname()[0])
-    s1.close()
-    '''
-    print "Address:", myip, ":", myport
+        peerDic[1] = [myip, myport]
+    else:
+        # ask for node one address
+        waitForFirstNode = True
+        while waitForFirstNode:
+            print "Please enter address of node one, x.x.x.x:xxxx"
+            sys.stdout.write("%")
+            addrIn = sys.stdin.readline()
+            addrInList = addrIn.rstrip('\n').split(":")
+            # check if input valid
+            if 2 != len(addrInList):
+                print "Invalid address!"
+            elif 4 != len(addrInList[0].split(".")):
+                print "Invalid ip!"
+            else:
+                peerDic[1] = [addrInList[0], int(addrInList[1])] 
+                # insert the address to peerlist
+                waitForFirstNode = False
+        # check if this is an valid address
+        
+        
+        
     
     # if not, ask for input of node one address
     # connect to node one, and get node number back
