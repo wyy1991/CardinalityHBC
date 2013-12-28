@@ -70,8 +70,8 @@ def createConnectFirstNodeMsg(originIP, originPort):
 
 
 def processPendingMsg(rawmsg, origin_addr):
-    print "recieved from address" + origin_addr
-    msgdict = json.loads(rawmsg)
+    print "recieved from address", origin_addr
+    msgdict = json.loads(str(rawmsg))[0]  # @@@ json to dictionary
     print msgdict
     return 0
 
@@ -121,11 +121,12 @@ def main():
                 # handle the netsocket socket
                 try:
                     data,address = netsocket.recvfrom(size)
+                    print "received" + data
                     # got pending msg
                     processPendingMsg(data, address)
                     
-                 
-                except:
+                except socket.error, (code,message):
+                    print "Error: socket broken: " + message
                     running = False
     
             elif s == sys.stdin:
