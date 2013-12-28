@@ -5,7 +5,8 @@ import select
 import socket
 import random
 import sys
-
+from urllib import urlopen
+import re
 from random import randint
 
 #--------create socket-----------------------------------------------------
@@ -13,13 +14,13 @@ def createSocket():
     newsocket = None
     host = ''
     port = 50000 + randint(1,1000)
-    size = 1024
+
     
     # create socket
     try:
         newsocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         newsocket.bind((host,port))
-        print newsocket.getsockname()
+        #print newsocket.getsockname()
     except socket.error, (code,message):
         if newsocket:
             newsocket.close()
@@ -27,7 +28,12 @@ def createSocket():
         sys.exit(1)
         
     return newsocket
+#--------getPublicIP-----------------------------------------------------
+def getPublicIp():
+    data = str(urlopen('http://checkip.dyndns.com/').read())
+    # data = '<html><head><title>Current IP Check</title></head><body>Current IP Address: 65.96.168.198</body></html>\r\n'
 
+    return re.compile(r'Address: (\d+\.\d+\.\d+\.\d+)').search(data).group(1)
 #--------isFirstNode-----------------------------------------------------
 def isFirstNode():
     if len(sys.argv) <= 1:
@@ -37,8 +43,28 @@ def isFirstNode():
         return True
 #--------main function-----------------------------------------------------
 def main():
-    isNodeOne = isFirstNode()
+    size = 1024
+    # create socket
     netsocket = createSocket()
+    myip = getPublicIp()
+    myport = netsocket.getsockname()[1] 
+    
+    myNodeNum = 0;
+    if True == isFirstNode():
+        myNodeNum = 1
+    # if node one, show global address
+    '''
+    s1 = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    s1.connect(("gmail.com",80))
+    print(s1.getsockname()[0])
+    s1.close()
+    '''
+    print "Address:", myip, ":", myport
+    
+    # if not, ask for input of node one address
+    # connect to node one, and get node number back
+    
+    
     # loop through sockets
     input = [netsocket,sys.stdin]
     running = True
@@ -65,8 +91,8 @@ def main():
                 if textin == "q\n":
                     running = False
                 else:
-                    netsocket.sendto(textin,(host,port)) 
-                   
+                    #netsocket.sendto(textin,(host,port)) 
+                    running = True
                 
     # close netsocket socket
     netsocket.close()
