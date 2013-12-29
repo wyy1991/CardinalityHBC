@@ -14,6 +14,7 @@ from random import randint
 netsocket = None
 peerDic = {}
 myNodeNum = 0
+firstNodeStatus = ''  # "WaitForPeers"  "StopAcceptingPeers" "StartComputing"
 
 #--------create socket-----------------------------------------------------
 def createSocket():
@@ -78,9 +79,21 @@ def createRplyNodeNumMsg(n):
               'OriginNum':1}
     msgStr=json.dumps(msgDic)
     return msgStr
+
+
+#--------createPeerListMsg-----------------------------------------------------
+def createPeerListMsg():
+    msgDic = {'PeerList':peerDic,
+              'OriginNum':1}
+    msgStr=json.dumps(msgDic)
+    return msgStr
 #--------processJoinMsg-----------------------------------------------------
 def processJoinMsg(origin_addr):
-    global peerDic
+    global peerDic 
+    if 1 != myNodeNum or firstNodeStatus !="WaitForPeers":
+        print "Not accepting new peers now!"
+        return
+    
     originInList = False
     for number, address in peerDic.items() :
         if address == origin_addr:
@@ -88,7 +101,7 @@ def processJoinMsg(origin_addr):
     if originInList == False:
         # insert origin into peerDict
         newNodeNum =len(peerDic)
-        peerDic[newNodeNum] = [origin_addr[0], origin_addr[1]]
+        peerDic[newNodeNum] = (origin_addr[0], origin_addr[1])
         print "Insert peer No.", newNodeNum
         rplyNodeNumMsg = createRplyNodeNumMsg(newNodeNum)
         netsocket.sendto(rplyNodeNumMsg, origin_addr)
@@ -98,6 +111,8 @@ def processJoinMsg(origin_addr):
 def processRplyNodeNumMsg(msgdict):
     global myNodeNum
     global peerDic
+    if 1 != myNodeNum:
+        return
     # set my node number 
     if 0==myNodeNum and 1==int(msgdict['OriginNum']):
         myNodeNum = int(msgdict['NodeNum'])
@@ -111,15 +126,24 @@ def processPendingMsg(rawmsg, origin_addr):
     print "recieved from address", origin_addr
     msgdict = json.loads(str(rawmsg))  # @@@ json to dictionary
     
-    if 'Join' in msgdict and 1 == myNodeNum:
+    if 'Join' in msgdict:
         processJoinMsg(origin_addr)
     if 'NodeNum' in msgdict and 'OriginNum' in msgdict:
         processRplyNodeNumMsg(msgdict)
         
    
+#--------broadcastPeerList-----------------------------------------------------
+def broadcastPeerList():
+    print peerDic
+    # send message to all peers
+    pListMsg = createPeerListMsg()
+    for number, address in peerDic.items() :
+        netsocket.sendto(pListMsg,address)
+    
 #--------the big loop-----------------------------------------------------
 def mainLoop():
     global netsocket
+    global firstNodeStatus
     # loop through sockets
     input = [netsocket,sys.stdin]
     running = True
@@ -149,9 +173,11 @@ def mainLoop():
                 
                 if textin == "q\n":
                     running = False
-                elif textin == "s\n":
+                elif textin == "s\n" and myNodeNum == 1:
                     #@@@ to do start computing
-                    next = 0 #@@@ to do
+                    firstNodeStatus = "StopAcceptingPeers"
+                    print "Stop accepting new peers."
+                    broadcastPeerList()
                 else:
                     #netsocket.sendto(textin,(host,port)) 
                     running = True
@@ -164,6 +190,7 @@ def main():
     global netsocket
     global peerDic
     global myNodeNum
+    global firstNodeStatus 
     
     iamNodeOne = isFirstNode()
    
@@ -179,6 +206,7 @@ def main():
     myNodeNum = 0;
     if iamNodeOne:
         myNodeNum = 1
+        firstNodeStatus = "WaitForPeers"
         peerDic[1] = (myip, myport)
     else:
         enterFirstNodeAddr()
