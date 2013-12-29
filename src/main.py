@@ -138,7 +138,8 @@ def broadcastPeerList():
     # send message to all peers
     pListMsg = createPeerListMsg()
     for number, address in peerDic.items() :
-        netsocket.sendto(pListMsg,address)
+        if number != 0 and number != myNodeNum:
+            netsocket.sendto(pListMsg,address)
     
 #--------the big loop-----------------------------------------------------
 def mainLoop():
