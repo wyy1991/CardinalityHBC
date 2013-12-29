@@ -90,6 +90,7 @@ def createPeerListMsg():
 #--------processJoinMsg-----------------------------------------------------
 def processJoinMsg(origin_addr):
     global peerDic 
+    global myNodeNum
     if 1 != myNodeNum or firstNodeStatus !="WaitForPeers":
         print "Not accepting new peers now!"
         return
@@ -111,7 +112,7 @@ def processJoinMsg(origin_addr):
 def processRplyNodeNumMsg(msgdict):
     global myNodeNum
     global peerDic
-    if 1 != myNodeNum:
+    if 1 == myNodeNum:
         return
     # set my node number 
     if 0==myNodeNum and 1==int(msgdict['OriginNum']):
@@ -120,7 +121,24 @@ def processRplyNodeNumMsg(msgdict):
         peerDic[myNodeNum] = peerDic[0]
         print "My node num is :", myNodeNum
 
-        
+#--------processPeerListMsg-----------------------------------------------------  
+def processPeerListMsg(msgdict):
+    global peerDic
+    global myNodeNum
+    
+    # update my address at 0
+    # update peer dic
+    if msgdict['OriginNum']!=1:
+        return
+    newPeerDic = msgdict['PeerList']
+    for num, addr in newPeerDic.items():
+        if int(num) != 0 and int(num) != 1:
+            peerDic[int(num)]=(str(addr[0]),addr[1])
+    print myNodeNum
+    myaddr = newPeerDic[str(myNodeNum)]
+    peerDic[0]=(str(myaddr[0]),myaddr[1])
+    print "UpdatedPeerList"
+    print peerDic
 #--------processPendingMsg-----------------------------------------------------    
 def processPendingMsg(rawmsg, origin_addr):
     print "recieved from address", origin_addr
@@ -130,10 +148,13 @@ def processPendingMsg(rawmsg, origin_addr):
         processJoinMsg(origin_addr)
     if 'NodeNum' in msgdict and 'OriginNum' in msgdict:
         processRplyNodeNumMsg(msgdict)
+    if 'PeerList' in msgdict and 'OriginNum' in msgdict:
+        processPeerListMsg(msgdict)
         
    
 #--------broadcastPeerList-----------------------------------------------------
 def broadcastPeerList():
+    print "broadcast peer list"
     print peerDic
     # send message to all peers
     pListMsg = createPeerListMsg()
@@ -162,7 +183,7 @@ def mainLoop():
                     print "received" + data
                     # got pending msg
                     processPendingMsg(data, address)
-                    print peerDic
+                    
                     
                 except socket.error, (code,message):
                     print "Error: socket broken: " + message
@@ -211,7 +232,7 @@ def main():
         peerDic[1] = (myip, myport)
     else:
         enterFirstNodeAddr()
-        print peerDic
+        print "First node set."
         # create message
         joinmsg = createConnectFirstNodeMsg(myip, myport)
         # send message to first node
