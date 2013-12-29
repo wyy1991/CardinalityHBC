@@ -65,7 +65,6 @@ def enterFirstNodeAddr():
             peerDic[1] = (addrInList[0], int(addrInList[1])) 
             # insert the address to peerlist
             waitForFirstNode = False
-    return peerDic
 #--------createConnectFirstNodeMsg-----------------------------------------------------
 def createConnectFirstNodeMsg(originIP, originPort):
     msgDic = {'Origin':[originIP, originPort],
@@ -94,6 +93,7 @@ def processJoinMsg(origin_addr):
         rplyNodeNumMsg = createRplyNodeNumMsg(newNodeNum)
         netsocket.sendto(rplyNodeNumMsg, origin_addr)
 
+
 #--------processRplyNodeNumMsg-----------------------------------------------------
 def processRplyNodeNumMsg(msgdict):
     global myNodeNum
@@ -104,6 +104,7 @@ def processRplyNodeNumMsg(msgdict):
         #insert into peerdic
         peerDic[myNodeNum] = peerDic[0]
         print "My node num is :", myNodeNum
+
         
 #--------processPendingMsg-----------------------------------------------------    
 def processPendingMsg(rawmsg, origin_addr):
@@ -114,50 +115,16 @@ def processPendingMsg(rawmsg, origin_addr):
         processJoinMsg(origin_addr)
     if 'NodeNum' in msgdict and 'OriginNum' in msgdict:
         processRplyNodeNumMsg(msgdict)
+        
    
-
-#--------main function-----------------------------------------------------
-def main():
+#--------the big loop-----------------------------------------------------
+def mainLoop():
     global netsocket
-    global peerDic
-    global myNodeNum
-    
-    iamNodeOne = isFirstNode()
-    size = 1024
-    # create socket
-    createSocket()
-    #myip = getPublicIp()
-    myip = netsocket.getsockname()[0] 
-    myport = netsocket.getsockname()[1] 
-    print "Address:", myip, ":", myport
-    
-    # <peer number, address>
-    peerDic[0] = (myip, myport) # key 0, stores my address
-    myNodeNum = 0;
-    if iamNodeOne:
-        myNodeNum = 1
-        peerDic[1] = (myip, myport)
-    else:
-        peerDic = enterFirstNodeAddr()
-        print peerDic
-        # create message
-        joinmsg = createConnectFirstNodeMsg(myip, myport)
-        # send message to first node
-        netsocket.sendto(joinmsg,(peerDic[1][0], peerDic[1][1]))
-        
-        
-    
-    # if not, ask for input of node one address
-    # connect to node one, and get node number back
-    
-    if iamNodeOne:
-        print "Waiting for other nodes to join..."
-        print "Enter s to stop waiting and start. Enter q to quit."
-    
     # loop through sockets
     input = [netsocket,sys.stdin]
     running = True
-    
+    size = 1024
+    print "waiting in main loop..."
     while running:
         inputready,outputready,exceptready = select.select(input,[],[])
         
@@ -192,6 +159,44 @@ def main():
     # close netsocket socket
     netsocket.close()
     sys.stdout.write("netsocket closed.")
+#--------main function-----------------------------------------------------
+def main():
+    global netsocket
+    global peerDic
+    global myNodeNum
+    
+    iamNodeOne = isFirstNode()
+   
+    # create socket
+    createSocket()
+    #myip = getPublicIp()
+    myip = netsocket.getsockname()[0] 
+    myport = netsocket.getsockname()[1] 
+    print "Address:", myip, ":", myport
+    
+    # <peer number, address>
+    peerDic[0] = (myip, myport) # key 0, stores my address
+    myNodeNum = 0;
+    if iamNodeOne:
+        myNodeNum = 1
+        peerDic[1] = (myip, myport)
+    else:
+        enterFirstNodeAddr()
+        print peerDic
+        # create message
+        joinmsg = createConnectFirstNodeMsg(myip, myport)
+        # send message to first node
+        netsocket.sendto(joinmsg,(peerDic[1][0], peerDic[1][1]))
+        
+    # if not, ask for input of node one address
+    # connect to node one, and get node number back
+    
+    if iamNodeOne:
+        print "Waiting for other nodes to join..."
+        print "Enter s to stop waiting and start. Enter q to quit."
+    
+    mainLoop()
+  
 #-------main------------------------------------------------------
 if __name__ == '__main__':
     main()
