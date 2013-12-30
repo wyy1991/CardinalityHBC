@@ -155,9 +155,12 @@ def createRplyNodeNumMsg(n):
 
 #--------createPeerListMsg-----------------------------------------------------
 def createPeerListMsg():
+    skey = [sk.l, sk.m]
+    pkey = [pk.n, pk.n_sq, pk.g]
+    
     msgDic = {'PeerList':peerDic,
-              'SKey':sk,
-              'PKey':pk,
+              'SKey':skey,
+              'PKey':pkey,
               'OriginNum':1}
     msgStr=json.dumps(msgDic)
     return msgStr
@@ -216,8 +219,16 @@ def processPeerListMsg(msgdict):
         return
     if msgdict['OriginNum']!=1:
         return
-    sk = msgdict['SKey']
-    pk = msgdict['PKey']
+    skey = msgdict['SKey']
+    pkey = msgdict['PKey']
+    
+    sk = paillier.PrivateKey()
+    pk = paillier.PublicKey()
+    sk.l = skey[0]
+    sk.m = skey[1]
+    pk.n = pkey[0]
+    pk.n_sq = pkey[1]
+    pk.g = pkey[2] 
     print "Updated sk pk"
     newPeerDic = msgdict['PeerList']
     for num, addr in newPeerDic.items():
