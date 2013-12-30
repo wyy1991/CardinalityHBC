@@ -12,6 +12,9 @@ from random import randint
 import time
 import math
 import numpy as np
+import paillier
+
+
 
 #-----Global variables-----------------------------------------------------
 netsocket = None
@@ -25,15 +28,37 @@ k_set_size = 5 # set size
 s_set = list() #local set
 # sk, pk
 
-
-
+#--------Homo crypto-----------------------------------------------------
+def homo_generateKeyPair(numOfBits):
+    priv, pub = paillier.generate_keypair(numOfBits)
+    return priv, pub
+def homo_encrypt(pub,plain):
+    return paillier.encrypt(pub, plain)
+def homo_decrypt(priv, pub, cipher):
+    return paillier.decrypt(priv, pub, cipher)
+def homo_add(pub, cipher_a, cipher_b):
+    #returns E(m1 + m2) given E(m1) and E(m2).
+    return paillier.e_add(pub, cipher_a, cipher_b)
+def homo_mult(pub, ciphertext, n):
+    return paillier.e_mul_const(pub, ciphertext, n)
+def homo_affine(pub, ciphertext, a, b):
+    #Returns E(a*m + b) given E(m), a and b.
+    a_mult_ciphertext = pow(ciphertext, a, pub.n_sq)
+    return a_mult_ciphertext * pow(pub.g, b, pub.n_sq) % pub.n_sq
 #--------stepOne-----------------------------------------------------
 def stepOne():
     # calculate polynomial fi
     fi = np.poly1d(s_set,True).c
     print "fi:",fi
     # encrypt fi
+    fi_encrypt=[]
     
+    priv, pub = paillier.generate_keypair(512)
+    print priv, pub
+    cx = paillier.encrypt(pub, 9)
+    print "cx =", cx
+    
+        
     # send encrypt fi to i+1 ... i+c
     
     # choose c+1 random poly 0 ... c with degree k
