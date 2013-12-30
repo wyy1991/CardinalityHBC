@@ -11,6 +11,7 @@ from urllib import urlopen
 from random import randint
 import time
 import math
+import numpy as np
 
 #-----Global variables-----------------------------------------------------
 netsocket = None
@@ -29,7 +30,8 @@ s_set = list() #local set
 #--------stepOne-----------------------------------------------------
 def stepOne():
     # calculate polynomial fi
-    
+    fi = np.poly1d(s_set,True).c
+    print "fi:",fi
     # encrypt fi
     
     # send encrypt fi to i+1 ... i+c
@@ -251,7 +253,9 @@ def main():
     global firstNodeStatus 
     
     iamNodeOne = isFirstNode()
+    # local computation
     initLocalSet()
+    stepOne()
     # create socket
     createSocket()
     #myip = getPublicIp()
