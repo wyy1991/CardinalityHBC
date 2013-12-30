@@ -27,9 +27,9 @@ n_hbc = 0 # n>2 number of hbc
 c_collude = 2 # c<n, dishonesty colluding peers
 k_set_size = 5 # set size
 s_set = list() #local set
-# sk, pk
-sk = None
-pk = None
+sk = None # private key
+pk = None # public key
+
 
 #--------Homo crypto-----------------------------------------------------
 def homo_generateKeyPair(numOfBits):
@@ -56,30 +56,41 @@ def generateKeyPair():
     global sk
     global pk
     if myNodeNum == 1:
-        priv, pub = homo_generateKeyPair(128)
+        priv, pub = homo_generateKeyPair(64)
         sk = priv
         pk = pub
         
-#--------stepOne_part1-----------------------------------------------------
-def stepOne_part1():
+#--------stepOne_ab-----------------------------------------------------
+def stepOne_ab():
     # calculate polynomial fi
     fi = np.poly1d(s_set,True).c
     print "fi:",fi
     # encrypt fi
+    fi_enc = []
+    for val in fi:
+        fi_enc.append(homo_encrypt(pk,val))
+    print "fi_enc:", fi_enc
+    # create new message fi
     
-        
     # send encrypt fi to i+1 ... i+c
-    
+    print "send fi_enc to ",myNodeNum+1," to ", myNodeNum+c_collude+1
+    for tar in range(1,c_collude+1):
+        tar_num = myNodeNum + tar
+        fi_msg = createFiMsg(fi_enc, tar_num)
+        netsocket.sendto(fi_msg, peerDic[tar_num])
+        
+        
+#--------stepOne_cd-----------------------------------------------------
+def stepOne_cd():
     # choose c+1 random poly 0 ... c with degree k
     
     # seems need to accept from other peers
     
     # calculate encryption of  theta i
     
-    
-    
-    
     return 0
+    
+    
 #--------initLocalSet-----------------------------------------------------
 def initLocalSet():
     global s_set
@@ -172,6 +183,24 @@ def createRplyMsg(replyText, targetNum):
               'OriginNum':myNodeNum}
     msgStr=json.dumps(msgDic)
     return msgStr
+
+#--------createFiyMsg(replyText)-----------------------------------------------------
+def createFiMsg(fi_enc, target):
+    msgDic = {'Fi_enc':fi_enc,
+              'TargetNum':target,
+              'OriginNum':myNodeNum}
+    msgStr=json.dumps(msgDic)
+    return msgStr
+
+
+#--------createCommandMsg-----------------------------------------------------
+def createCommandMsg(command,origin,target):
+    msgDic = {'Command':command,
+              'TargetNum':target,
+              'OriginNum':origin}
+    msgStr=json.dumps(msgDic)
+    return msgStr
+
 #--------processJoinMsg-----------------------------------------------------
 def processJoinMsg(origin_addr):
     global peerDic 
@@ -244,7 +273,7 @@ def processPeerListMsg(msgdict):
     pListRplyMsg = createRplyMsg('Received_PList_Keys',1)
     netsocket.sendto(pListRplyMsg,peerDic[1])
     print "send pListRplyMsg"
-#--------processReplyMsg-----------------------------------------------------
+#--------processReplyMsg-----------only first node------------------------------------------
 def processReplyMsg(msgdict, origin_addr):
     global reply_check_plist
     
@@ -258,9 +287,27 @@ def processReplyMsg(msgdict, origin_addr):
         reply_check_plist.append(originNum)
         if len(reply_check_plist) == n_hbc-1:
             print "All nodes received plist and keys."
+            #send out command for Step 1ab to all peer including me
+            for tar in range(1,n_hbc+1):
+                commandMsg = createCommandMsg('Start_Step_1ab',myNodeNum,tar)
+                netsocket.sendto(commandMsg,peerDic[tar])
             #@@@ Node 1 can start Step 1b
-        
+            
+
+#--------processCommandMsg-----------------------------------------------------
+def processCommandMsg(msgdict):
+    commandText = msgdict['Command']
+    originNum = msgdict['OriginNum']
+    targetNum = msgdict['TargetNum']
     
+    if originNum==1 and targetNum == myNodeNum and commandText=='Start_Step_1ab':
+        print "received command start_Step_1ab"
+        # start step 1ab
+        stepOne_ab()
+        
+#--------processFiEncMsg-----------------------------------------------------   
+def processFiEncMsg(msgdict):
+    stepOne_cd()
 #--------processPendingMsg-----------------------------------------------------    
 def processPendingMsg(rawmsg, origin_addr):
     print "recieved from address", origin_addr
@@ -274,6 +321,10 @@ def processPendingMsg(rawmsg, origin_addr):
         processPeerListMsg(msgdict)
     if 'TargetNum' in msgdict and 'OriginNum' in msgdict and 'Reply' in msgdict:
         processReplyMsg(msgdict, origin_addr)
+    if 'Command' in msgdict and 'TargetNum' in msgdict and 'OriginNum' in msgdict:
+        processCommandMsg(msgdict)
+    if 'Fi_enc' in msgdict and 'TargetNum' in msgdict and 'OriginNum' in msgdict:
+        processFiEncMsg(msgdict)
     
 #--------broadcastPeerList-----------------------------------------------------
 def broadcastPeerListandKeys():
