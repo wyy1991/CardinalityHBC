@@ -21,12 +21,15 @@ netsocket = None
 peerDic = {}
 myNodeNum = 0
 firstNodeStatus = ''  # "WaitForPeers"  "StopAcceptingPeers" "StartComputing"
+reply_check_plist = []
 #---parameters
 n_hbc = 0 # n>2 number of hbc
 c_collude = 2 # c<n, dishonesty colluding peers
 k_set_size = 5 # set size
 s_set = list() #local set
 # sk, pk
+sk = None
+pk = None
 
 #--------Homo crypto-----------------------------------------------------
 def homo_generateKeyPair(numOfBits):
@@ -40,13 +43,25 @@ def homo_add(pub, cipher_a, cipher_b):
     #returns E(m1 + m2) given E(m1) and E(m2).
     return paillier.e_add(pub, cipher_a, cipher_b)
 def homo_mult(pub, ciphertext, n):
+    #Returns E(a*m) given E(m), a
     return paillier.e_mul_const(pub, ciphertext, n)
 def homo_affine(pub, ciphertext, a, b):
     #Returns E(a*m + b) given E(m), a and b.
     a_mult_ciphertext = pow(ciphertext, a, pub.n_sq)
     return a_mult_ciphertext * pow(pub.g, b, pub.n_sq) % pub.n_sq
-#--------stepOne-----------------------------------------------------
-def stepOne():
+
+
+#--------broadcastPeerList-----------------------------------------------------
+def generateKeyPair():    
+    global sk
+    global pk
+    if myNodeNum == 1:
+        priv, pub = homo_generateKeyPair(128)
+        sk = priv
+        pk = pub
+        
+#--------stepOne_part1-----------------------------------------------------
+def stepOne_part1():
     # calculate polynomial fi
     fi = np.poly1d(s_set,True).c
     print "fi:",fi
@@ -141,7 +156,17 @@ def createRplyNodeNumMsg(n):
 #--------createPeerListMsg-----------------------------------------------------
 def createPeerListMsg():
     msgDic = {'PeerList':peerDic,
+              'SKey':sk,
+              'PKey':pk,
               'OriginNum':1}
+    msgStr=json.dumps(msgDic)
+    return msgStr
+
+#--------createRplyMsg(replyText)-----------------------------------------------------
+def createRplyMsg(replyText, targetNum):
+    msgDic = {'Reply':replyText,
+              'TargetNum':targetNum,
+              'OriginNum':myNodeNum}
     msgStr=json.dumps(msgDic)
     return msgStr
 #--------processJoinMsg-----------------------------------------------------
@@ -182,11 +207,18 @@ def processRplyNodeNumMsg(msgdict):
 def processPeerListMsg(msgdict):
     global peerDic
     global myNodeNum
+    global sk
+    global pk
     
     # update my address at 0
     # update peer dic
+    if myNodeNum == 1:
+        return
     if msgdict['OriginNum']!=1:
         return
+    sk = msgdict['SKey']
+    pk = msgdict['PKey']
+    print "Updated sk pk"
     newPeerDic = msgdict['PeerList']
     for num, addr in newPeerDic.items():
         if int(num) != 0 and int(num) != 1:
@@ -196,6 +228,30 @@ def processPeerListMsg(msgdict):
     peerDic[0]=(str(myaddr[0]),myaddr[1])
     print "UpdatedPeerList"
     print peerDic
+    
+    #send reply to node one
+    pListRplyMsg = createRplyMsg('Received_PList_Keys')
+    netsocket.sendto(pListRplyMsg,peerDic[1])
+    print "send pListRplyMsg"
+#--------processReplyMsg-----------------------------------------------------
+def processReplyMsg(msgdict, origin_addr):
+    global reply_check_plist
+    
+    originNum = msgdict['OriginNum']
+    replyText = msgdict['Reply']
+    targetNum = msgdict['TargetNum']
+    #only target node receives the msg
+    if targetNum!=myNodeNum:
+        return
+    
+    if replyText == 'Received_PList_Keys':
+        reply_check_plist.append(originNum)
+        if len(reply_check_plist) == n_hbc-1:
+            print "All nodes received plist and keys."
+            #@@@ Node 1 can start Step 1b
+        
+        
+    
 #--------processPendingMsg-----------------------------------------------------    
 def processPendingMsg(rawmsg, origin_addr):
     print "recieved from address", origin_addr
@@ -205,12 +261,13 @@ def processPendingMsg(rawmsg, origin_addr):
         processJoinMsg(origin_addr)
     if 'NodeNum' in msgdict and 'OriginNum' in msgdict:
         processRplyNodeNumMsg(msgdict)
-    if 'PeerList' in msgdict and 'OriginNum' in msgdict:
+    if 'PeerList' in msgdict and 'OriginNum' in msgdict and 'SKey' in msgdict and'PKey' in msgdict:
         processPeerListMsg(msgdict)
-        
-   
+    if 'TargetNum' in msgdict and 'OriginNum' in msgdict and 'Reply' in msgdict:
+        processReplyMsg(msgdict, origin_addr)
+    
 #--------broadcastPeerList-----------------------------------------------------
-def broadcastPeerList():
+def broadcastPeerListandKeys():
     print "broadcast peer list"
     print peerDic
     # send message to all peers
@@ -218,7 +275,7 @@ def broadcastPeerList():
     for number, address in peerDic.items() :
         if number != 0 and number != myNodeNum:
             netsocket.sendto(pListMsg,address)
-    
+
 #--------the big loop-----------------------------------------------------
 def mainLoop():
     global netsocket
@@ -256,7 +313,10 @@ def mainLoop():
                     #@@@ to do start computing
                     firstNodeStatus = "StopAcceptingPeers"
                     print "Stop accepting new peers."
-                    broadcastPeerList()
+                    generateKeyPair()
+                    print "sk=",sk,"pk=",pk
+                    broadcastPeerListandKeys()
+
                 else:
                     #netsocket.sendto(textin,(host,port)) 
                     running = True
@@ -274,7 +334,6 @@ def main():
     iamNodeOne = isFirstNode()
     # local computation
     initLocalSet()
-    stepOne()
     # create socket
     createSocket()
     #myip = getPublicIp()
