@@ -36,12 +36,12 @@ def modpow(base, exponent, modulus):
     return result
 
 class PrivateKey(object):
-    def __init__(self, p, q, n):
+    def __init__(self, p=3, q=5, n=15):
         self.l = (p-1) * (q-1)
         self.m = invmod(self.l, n)
 
 class PublicKey(object):
-    def __init__(self, n):
+    def __init__(self, n=15):
         self.n = n
         self.n_sq = n * n
         self.g = n + 1

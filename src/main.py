@@ -234,14 +234,14 @@ def processPeerListMsg(msgdict):
     for num, addr in newPeerDic.items():
         if int(num) != 0 and int(num) != 1:
             peerDic[int(num)]=(str(addr[0]),addr[1])
-    print myNodeNum
+    print "MyNodeNum=",myNodeNum
     myaddr = newPeerDic[str(myNodeNum)]
     peerDic[0]=(str(myaddr[0]),myaddr[1])
     print "UpdatedPeerList"
     print peerDic
     
     #send reply to node one
-    pListRplyMsg = createRplyMsg('Received_PList_Keys')
+    pListRplyMsg = createRplyMsg('Received_PList_Keys',1)
     netsocket.sendto(pListRplyMsg,peerDic[1])
     print "send pListRplyMsg"
 #--------processReplyMsg-----------------------------------------------------
@@ -254,13 +254,11 @@ def processReplyMsg(msgdict, origin_addr):
     #only target node receives the msg
     if targetNum!=myNodeNum:
         return
-    
     if replyText == 'Received_PList_Keys':
         reply_check_plist.append(originNum)
         if len(reply_check_plist) == n_hbc-1:
             print "All nodes received plist and keys."
             #@@@ Node 1 can start Step 1b
-        
         
     
 #--------processPendingMsg-----------------------------------------------------    
@@ -291,6 +289,7 @@ def broadcastPeerListandKeys():
 def mainLoop():
     global netsocket
     global firstNodeStatus
+    global n_hbc
     # loop through sockets
     input = [netsocket,sys.stdin]
     running = True
@@ -324,6 +323,7 @@ def mainLoop():
                     #@@@ to do start computing
                     firstNodeStatus = "StopAcceptingPeers"
                     print "Stop accepting new peers."
+                    n_hbc = len(peerDic) - 1
                     generateKeyPair()
                     print "sk=",sk,"pk=",pk
                     broadcastPeerListandKeys()
