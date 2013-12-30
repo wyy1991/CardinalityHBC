@@ -51,12 +51,6 @@ def stepOne():
     fi = np.poly1d(s_set,True).c
     print "fi:",fi
     # encrypt fi
-    fi_encrypt=[]
-    
-    priv, pub = paillier.generate_keypair(512)
-    print priv, pub
-    cx = paillier.encrypt(pub, 9)
-    print "cx =", cx
     
         
     # send encrypt fi to i+1 ... i+c
