@@ -9,13 +9,30 @@ import json
 import re
 from urllib import urlopen
 from random import randint
+import time
 
 #-----Global variables-----------------------------------------------------
 netsocket = None
 peerDic = {}
 myNodeNum = 0
 firstNodeStatus = ''  # "WaitForPeers"  "StopAcceptingPeers" "StartComputing"
+#---parameters
+n_hbc = 0 # n>2 number of hbc
+c_collude = 0 # c<n, dishonesty colluding peers
+k_set_size = 5 # set size
+s_set = list() #local set
+# sk, pk
 
+
+
+#--------initLocalSet-----------------------------------------------------
+def initLocalSet():
+    global s_set
+    for i in range(0,k_set_size):
+        num = (int(time.time()*1000) + randint(0,10))%10
+        s_set.append(num)
+    print s_set
+    
 #--------create socket-----------------------------------------------------
 def createSocket():
     global netsocket
@@ -215,7 +232,7 @@ def main():
     global firstNodeStatus 
     
     iamNodeOne = isFirstNode()
-   
+    initLocalSet()
     # create socket
     createSocket()
     #myip = getPublicIp()
