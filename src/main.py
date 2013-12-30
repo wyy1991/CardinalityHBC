@@ -10,6 +10,7 @@ import re
 from urllib import urlopen
 from random import randint
 import time
+import math
 
 #-----Global variables-----------------------------------------------------
 netsocket = None
@@ -18,13 +19,31 @@ myNodeNum = 0
 firstNodeStatus = ''  # "WaitForPeers"  "StopAcceptingPeers" "StartComputing"
 #---parameters
 n_hbc = 0 # n>2 number of hbc
-c_collude = 0 # c<n, dishonesty colluding peers
+c_collude = 2 # c<n, dishonesty colluding peers
 k_set_size = 5 # set size
 s_set = list() #local set
 # sk, pk
 
 
 
+#--------stepOne-----------------------------------------------------
+def stepOne():
+    # calculate polynomial fi
+    
+    # encrypt fi
+    
+    # send encrypt fi to i+1 ... i+c
+    
+    # choose c+1 random poly 0 ... c with degree k
+    
+    # seems need to accept from other peers
+    
+    # calculate encryption of  theta i
+    
+    
+    
+    
+    return 0
 #--------initLocalSet-----------------------------------------------------
 def initLocalSet():
     global s_set
