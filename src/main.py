@@ -70,18 +70,24 @@ def homo_add_poly(f1, f2):
             g[i]=f2[i]
     return g
 def homo_mult_poly(pub, f1_enc, f2):
+    print f1_enc
+    print f2
     g=[]
-    len_f1 = len(f1_enc)
-    len_f2 = len(f2)
-    len_g = len_f1 + len_f2 - 1
-    for bigi in range(0,len_g):
-        g[len_g - bigi] = 0
-        for i in range(0, bigi):
-            if len_f1-(bigi-i) < 0 or len_f2-i < 0:
+    deg_f1 = len(f1_enc)-1
+    deg_f2 = len(f2)-1
+    deg_g = deg_f1 + deg_f2 
+    for gi in range(0,deg_g+1):
+        g.append(0)
+    for bigi in range(0,deg_g+1):
+        for i in range(0, bigi+1):
+            if deg_f1-(bigi-i) < 0 or deg_f2-i < 0:
                 e_mult = 0
             else:
-                e_mult = homo_mult(pub, f1_enc[len_f1-(bigi-i)], f2[len_f2-i])
-            g[len_g - bigi] = homo_add(pub, g[len_g - bigi], e_mult)
+                e_mult = homo_mult(pub, f1_enc[deg_f1-(bigi-i)], f2[deg_f2-i])
+            if 0==g[deg_g - bigi]:
+                g[deg_g - bigi] = e_mult
+            elif 0!=e_mult:
+                g[deg_g - bigi] = homo_add(pub, g[deg_g - bigi], e_mult)
     return g
 #--------broadcastPeerList-----------------------------------------------------
 def generateKeyPair():    
@@ -94,6 +100,7 @@ def generateKeyPair():
         
 #--------stepOne_ab-----------------------------------------------------
 def stepOne_ab():
+    global fi_enc_dic
     # calculate polynomial fi
     fi = np.poly1d(s_set,True).c
     print "fi:",fi
@@ -127,6 +134,7 @@ def stepOne_cd():
     degree = k_set_size
     r = []
     # for num from received
+    print "fi_enc_dic = ", fi_enc_dic.keys()
     for num in fi_enc_dic.keys():
         r = []
         for d in range(0,degree+1):
@@ -376,8 +384,9 @@ def processFiEncMsg(msgdict):
     originNum = msgdict['OriginNum']
     targetNum = msgdict['TargetNum']
     fi_enc_dic[originNum] = fi_enc
+    print "got fi from ", originNum
     #check if received enough to go to next step
-    if len(fi_enc_dic) == c_collude: 
+    if len(fi_enc_dic) >= c_collude+1:  # add the one from self
         stepOne_cd()
 #--------processPendingMsg-----------------------------------------------------    
 def processPendingMsg(rawmsg, origin_addr):
@@ -448,7 +457,23 @@ def mainLoop():
                     n_hbc = len(peerDic) - 1
                     generateKeyPair()
                     print "sk=",sk,"pk=",pk
+                    #@@@ testcode
+                    '''
+                    print "------test--------"
+                    print homo_decrypt(sk, pk,homo_add(pk, 0,homo_encrypt(pk,2)))
+                    print 'E(2)x3=', homo_mult(pk, homo_encrypt(pk,3), 2)
+                    print homo_decrypt(sk, pk,  homo_mult(pk, homo_encrypt(pk,1), -2))
+                    polya = np.poly1d([3,2,1])
+                    polyb = np.poly1d([3,2,1])
+                    print np.polymul(polya, polyb)
+                    
+                    ppoly = homo_mult_poly(pk, [homo_encrypt(pk,3),homo_encrypt(pk,2),homo_encrypt(pk,1)], [3,2,1])
+                    for p in ppoly:
+                        print homo_decrypt(sk, pk,p )
+                    print "----------------"
+                    '''
                     broadcastPeerListandKeys()
+                    
 
                 else:
                     #netsocket.sendto(textin,(host,port)) 
