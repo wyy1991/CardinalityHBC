@@ -22,6 +22,8 @@ peerDic = {}
 myNodeNum = 0
 firstNodeStatus = ''  # "WaitForPeers"  "StopAcceptingPeers" "StartComputing"
 reply_check_plist = []
+fi_enc_dic = {} # dictionary of <node num, list of fi_enc's coeff[]>
+r_set = {} # <nodeNum, list of r's coeff[]> 
 #---parameters
 n_hbc = 0 # n>2 number of hbc
 c_collude = 2 # c<n, dishonesty colluding peers
@@ -86,13 +88,20 @@ def stepOne_ab():
         
 #--------stepOne_cd-----------------------------------------------------
 def stepOne_cd():
+    global r_set
+    global fi_enc_dic
+    print "Start step 1cd."
     # choose c+1 random poly 0 ... c with degree k
-    
-    # seems need to accept from other peers
-    
+    degree = k_set_size
+    r = []
+    for num in fi_enc_dic.keys():
+        r = []
+        for d in range(0,degree+1):
+            r.append((int(time.time()*1000) + randint(0,10))%100)
+        r_set[num] = r
+    print "r_set = ",r_set
     # calculate encryption of  theta i
     
-    return 0
     
     
 #--------initLocalSet-----------------------------------------------------
@@ -310,10 +319,17 @@ def processCommandMsg(msgdict):
         print "received command start_Step_1ab"
         # start step 1ab
         stepOne_ab()
-        
+
 #--------processFiEncMsg-----------------------------------------------------   
 def processFiEncMsg(msgdict):
-    stepOne_cd()
+    global fi_enc_dic
+    fi_enc = msgdict['Fi_enc']
+    originNum = msgdict['OriginNum']
+    targetNum = msgdict['TargetNum']
+    fi_enc_dic[originNum] = fi_enc
+    #check if received enough to go to next step
+    if len(fi_enc_dic) == c_collude: 
+        stepOne_cd()
 #--------processPendingMsg-----------------------------------------------------    
 def processPendingMsg(rawmsg, origin_addr):
     print "received from address", origin_addr
