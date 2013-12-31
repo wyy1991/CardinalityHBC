@@ -73,9 +73,13 @@ def stepOne_ab():
     # create new message fi
     
     # send encrypt fi to i+1 ... i+c
-    print "send fi_enc to ",myNodeNum+1," to ", myNodeNum+c_collude+1
+    print "send fi_enc to "
+    print "n_hbc=",n_hbc
     for tar in range(1,c_collude+1):
         tar_num = myNodeNum + tar
+        if tar_num > n_hbc:
+            tar_num = tar_num - n_hbc 
+        print tar_num
         fi_msg = createFiMsg(fi_enc, tar_num)
         netsocket.sendto(fi_msg, peerDic[tar_num])
         
@@ -241,6 +245,7 @@ def processPeerListMsg(msgdict):
     global myNodeNum
     global sk
     global pk
+    global n_hbc
     
     # update my address at 0
     # update peer dic
@@ -266,6 +271,7 @@ def processPeerListMsg(msgdict):
     print "MyNodeNum=",myNodeNum
     myaddr = newPeerDic[str(myNodeNum)]
     peerDic[0]=(str(myaddr[0]),myaddr[1])
+    n_hbc = len(peerDic) - 1
     print "UpdatedPeerList"
     print peerDic
     
@@ -310,7 +316,7 @@ def processFiEncMsg(msgdict):
     stepOne_cd()
 #--------processPendingMsg-----------------------------------------------------    
 def processPendingMsg(rawmsg, origin_addr):
-    print "recieved from address", origin_addr
+    print "received from address", origin_addr
     msgdict = json.loads(str(rawmsg))  # @@@ json to dictionary
     
     if 'Join' in msgdict:
@@ -355,7 +361,7 @@ def mainLoop():
                 # handle the netsocket socket
                 try:
                     data,address = netsocket.recvfrom(size)
-                    print "received" + data
+                    #print "received" + data
                     # got pending msg
                     processPendingMsg(data, address)
                     
