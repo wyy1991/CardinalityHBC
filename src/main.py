@@ -24,6 +24,7 @@ firstNodeStatus = ''  # "WaitForPeers"  "StopAcceptingPeers" "StartComputing"
 reply_check_plist = []
 fi_enc_dic = {} # dictionary of <node num, list of fi_enc's coeff[]>
 r_set = {} # <nodeNum, list of r's coeff[]> 
+theta = []
 #---parameters
 n_hbc = 0 # n>2 number of hbc
 c_collude = 2 # c<n, dishonesty colluding peers
@@ -71,6 +72,7 @@ def stepOne_ab():
     fi_enc = []
     for val in fi:
         fi_enc.append(homo_encrypt(pk,val))
+    fi_enc_dic[myNodeNum]=fi_enc    # store into fi_enc_dic
     print "fi_enc:", fi_enc
     # create new message fi
     
@@ -90,18 +92,32 @@ def stepOne_ab():
 def stepOne_cd():
     global r_set
     global fi_enc_dic
+    global theta
     print "Start step 1cd."
     # choose c+1 random poly 0 ... c with degree k
     degree = k_set_size
     r = []
+    # for num from received
     for num in fi_enc_dic.keys():
         r = []
         for d in range(0,degree+1):
             r.append((int(time.time()*1000) + randint(0,10))%100)
         r_set[num] = r
     print "r_set = ",r_set
-    # calculate encryption of  theta i
     
+    # calculate encryption of  theta i
+    theta_poly = None
+    for index in range(0, c_collude+1):
+        if myNodeNum-index > n_hbc:
+            ind = myNodeNum-index-n_hbc
+        elif myNodeNum-index < 0:
+            ind = myNodeNum - index + n_hbc
+        else:
+            ind = myNodeNum -index
+        f_tmp = np.poly1d(fi_enc_dic)
+        r_tmp = np.poly1d(r_set)
+        #@@@ now 
+        
     
     
 #--------initLocalSet-----------------------------------------------------
