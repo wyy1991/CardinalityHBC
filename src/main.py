@@ -69,7 +69,7 @@ def homo_add_poly(f1, f2):
         for i in range(len(f1),len(f2)):
             g[i]=f2[i]
     return g
-def homo_mult_poly(f1_enc, f2):
+def homo_mult_poly(pub, f1_enc, f2):
     g=[]
     len_f1 = len(f1_enc)
     len_f2 = len(f2)
@@ -80,8 +80,8 @@ def homo_mult_poly(f1_enc, f2):
             if len_f1-(bigi-i) < 0 or len_f2-i < 0:
                 e_mult = 0
             else:
-                e_mult = homo_mult(pk, f1_enc[len_f1-(bigi-i)], f2[len_f2-i])
-            g[len_g - bigi] = homo_add(pk, g[len_g - bigi], e_mult)
+                e_mult = homo_mult(pub, f1_enc[len_f1-(bigi-i)], f2[len_f2-i])
+            g[len_g - bigi] = homo_add(pub, g[len_g - bigi], e_mult)
     return g
 #--------broadcastPeerList-----------------------------------------------------
 def generateKeyPair():    
@@ -135,7 +135,7 @@ def stepOne_cd():
     print "r_set = ",r_set
     
     # calculate encryption of  theta i
-    theta_poly = None
+    theta_coef = []
     for index in range(0, c_collude+1):
         if myNodeNum-index > n_hbc:
             ind = myNodeNum-index-n_hbc
@@ -143,9 +143,13 @@ def stepOne_cd():
             ind = myNodeNum - index + n_hbc
         else:
             ind = myNodeNum -index
-        f_tmp = np.poly1d(fi_enc_dic)
-        r_tmp = np.poly1d(r_set)
+        f_tmp = np.poly1d(fi_enc_dic[ind])
+        r_tmp = np.poly1d(r_set[ind])
         #@@@ now 
+        fxr_tmp = homo_mult_poly(pk,f_tmp, r_tmp)
+        theta_coef = homo_add_poly(fxr_tmp, theta_coef)
+    theta = theta_coef
+    print "theta = ", theta
         
         
     
