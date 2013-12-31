@@ -55,19 +55,23 @@ def homo_affine(pub, ciphertext, a, b):
 def homo_add_poly(f1, f2):
     # return E(g[i]) = E(f1) + E(f2)
     g=[]
-    if len(f1) == len(f2):
-        for i in range(0,len(f1)):
-            g[i]=f1[i] + f2[i]
-    if len(f1) > len(f2):
-        for i in range(0,len(f2)):
-            g[i]=f1[i] + f2[i]
-        for i in range(len(f2),len(f1)):
-            g[i]=f1[i]
-    if len(f1) < len(f2):
-        for i in range(0,len(f1)):
-            g[i]=f1[i] + f2[i]
-        for i in range(len(f1),len(f2)):
-            g[i]=f2[i]
+    degf1 = len(f1)-1
+    degf2 = len(f2)-1
+    if degf1 == degf2:
+        for i in range(0,degf1+1):
+            g.append(f1[i] + f2[i])
+    if degf1 > degf2:
+        for i in range(0,degf2+1):
+            print i
+            g.append(f1[i] + f2[i])
+        for i in range(degf2+1,degf1+1):
+            print i
+            g.append(f1[i])
+    if degf1 < degf2:
+        for i in range(0,degf1+1):
+            g.append(f1[i] + f2[i])
+        for i in range(degf1+1,degf2+1):
+            g.append(f2[i])
     return g
 def homo_mult_poly(pub, f1_enc, f2):
     print f1_enc
@@ -458,8 +462,12 @@ def mainLoop():
                     generateKeyPair()
                     print "sk=",sk,"pk=",pk
                     #@@@ testcode
-                    '''
+                    
                     print "------test--------"
+                    sum = homo_add_poly([homo_encrypt(pk,4),homo_encrypt(pk,3),homo_encrypt(pk,2),homo_encrypt(pk,1)], [homo_encrypt(pk,2),homo_encrypt(pk,1)])
+                    for p in sum:
+                        print homo_decrypt(sk, pk,p )
+                    '''
                     print homo_decrypt(sk, pk,homo_add(pk, 0,homo_encrypt(pk,2)))
                     print 'E(2)x3=', homo_mult(pk, homo_encrypt(pk,3), 2)
                     print homo_decrypt(sk, pk,  homo_mult(pk, homo_encrypt(pk,1), -2))
