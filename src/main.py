@@ -54,24 +54,32 @@ def homo_affine(pub, ciphertext, a, b):
     return a_mult_ciphertext * pow(pub.g, b, pub.n_sq) % pub.n_sq
 def homo_add_poly(f1, f2):
     # return E(g[i]) = E(f1) + E(f2)
-    g=[]
+    g = []
     degf1 = len(f1)-1
     degf2 = len(f2)-1
+    deg_g = 0
     if degf1 == degf2:
         for i in range(0,degf1+1):
-            g.append(f1[i] + f2[i])
-    if degf1 > degf2:
-        for i in range(0,degf2+1):
-            print i
-            g.append(f1[i] + f2[i])
-        for i in range(degf2+1,degf1+1):
-            print i
-            g.append(f1[i])
-    if degf1 < degf2:
+            g.append(0)
+        deg_g = len(g)-1
         for i in range(0,degf1+1):
-            g.append(f1[i] + f2[i])
+            g[i]= homo_add(pk, f1[i], f2[i])
+    if degf1 > degf2:
+        for i in range(0,degf1+1):
+            g.append(0)
+        deg_g = len(g)-1
+        for i in range(0,degf2+1):
+            g[deg_g-i]=homo_add(pk,f1[degf1-i],f2[degf2-i])
+        for i in range(degf2+1,degf1+1):
+            g[deg_g-i]=f1[degf1-i]
+    if degf1 < degf2:
+        for i in range(0,degf2+1):
+            g.append(0)
+        deg_g = len(g)-1
+        for i in range(0,degf1+1):
+            g[deg_g-i]=homo_add(pk,f1[degf1-i],f2[degf2-i])
         for i in range(degf1+1,degf2+1):
-            g.append(f2[i])
+            g[deg_g-i]=f2[degf2-i]
     return g
 def homo_mult_poly(pub, f1_enc, f2):
     print f1_enc
@@ -148,15 +156,9 @@ def stepOne_cd():
     
     # calculate encryption of  theta i
     theta_coef = []
-    for index in range(0, c_collude+1):
-        if myNodeNum-index > n_hbc:
-            ind = myNodeNum-index-n_hbc
-        elif myNodeNum-index < 0:
-            ind = myNodeNum - index + n_hbc
-        else:
-            ind = myNodeNum -index
-        f_tmp = np.poly1d(fi_enc_dic[ind])
-        r_tmp = np.poly1d(r_set[ind])
+    for index in fi_enc_dic.keys():
+        f_tmp = fi_enc_dic[index]
+        r_tmp = r_set[index]
         #@@@ now 
         fxr_tmp = homo_mult_poly(pk,f_tmp, r_tmp)
         theta_coef = homo_add_poly(fxr_tmp, theta_coef)
@@ -462,12 +464,13 @@ def mainLoop():
                     generateKeyPair()
                     print "sk=",sk,"pk=",pk
                     #@@@ testcode
-                    
+                    '''
                     print "------test--------"
                     sum = homo_add_poly([homo_encrypt(pk,4),homo_encrypt(pk,3),homo_encrypt(pk,2),homo_encrypt(pk,1)], [homo_encrypt(pk,2),homo_encrypt(pk,1)])
+                    print "sum = "
                     for p in sum:
                         print homo_decrypt(sk, pk,p )
-                    '''
+                    
                     print homo_decrypt(sk, pk,homo_add(pk, 0,homo_encrypt(pk,2)))
                     print 'E(2)x3=', homo_mult(pk, homo_encrypt(pk,3), 2)
                     print homo_decrypt(sk, pk,  homo_mult(pk, homo_encrypt(pk,1), -2))
