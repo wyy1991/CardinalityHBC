@@ -52,8 +52,37 @@ def homo_affine(pub, ciphertext, a, b):
     #Returns E(a*m + b) given E(m), a and b.
     a_mult_ciphertext = pow(ciphertext, a, pub.n_sq)
     return a_mult_ciphertext * pow(pub.g, b, pub.n_sq) % pub.n_sq
-
-
+def homo_add_poly(f1, f2):
+    # return E(g[i]) = E(f1) + E(f2)
+    g=[]
+    if len(f1) == len(f2):
+        for i in range(0,len(f1)):
+            g[i]=f1[i] + f2[i]
+    if len(f1) > len(f2):
+        for i in range(0,len(f2)):
+            g[i]=f1[i] + f2[i]
+        for i in range(len(f2),len(f1)):
+            g[i]=f1[i]
+    if len(f1) < len(f2):
+        for i in range(0,len(f1)):
+            g[i]=f1[i] + f2[i]
+        for i in range(len(f1),len(f2)):
+            g[i]=f2[i]
+    return g
+def homo_mult_poly(f1_enc, f2):
+    g=[]
+    len_f1 = len(f1_enc)
+    len_f2 = len(f2)
+    len_g = len_f1 + len_f2 - 1
+    for bigi in range(0,len_g):
+        g[len_g - bigi] = 0
+        for i in range(0, bigi):
+            if len_f1-(bigi-i) < 0 or len_f2-i < 0:
+                e_mult = 0
+            else:
+                e_mult = homo_mult(pk, f1_enc[len_f1-(bigi-i)], f2[len_f2-i])
+            g[len_g - bigi] = homo_add(pk, g[len_g - bigi], e_mult)
+    return g
 #--------broadcastPeerList-----------------------------------------------------
 def generateKeyPair():    
     global sk
@@ -118,7 +147,7 @@ def stepOne_cd():
         r_tmp = np.poly1d(r_set)
         #@@@ now 
         
-    
+        
     
 #--------initLocalSet-----------------------------------------------------
 def initLocalSet():
