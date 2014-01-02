@@ -41,7 +41,10 @@ def homo_generateKeyPair(numOfBits):
     priv, pub = paillier.generate_keypair(numOfBits)
     return priv, pub
 def homo_encrypt(pub,plain):
-    return paillier.encrypt(pub, plain)
+    try:
+        return paillier.encrypt(pub, plain)
+    except:
+        return 0
 def homo_decrypt(priv, pub, cipher):
     return paillier.decrypt(priv, pub, cipher)
 def homo_add(pub, cipher_a, cipher_b):
@@ -90,8 +93,6 @@ def homo_add_poly(f1, f2):
             g[deg_g-i]=f2[degf2-i]
     return g
 def homo_mult_poly(pub, f1_enc, f2):
-    print f1_enc
-    print f2
     g=[]
     deg_f1 = len(f1_enc)-1
     deg_f2 = len(f2)-1
@@ -128,7 +129,7 @@ def generateKeyPair():
     global sk
     global pk
     if myNodeNum == 1:
-        priv, pub = homo_generateKeyPair(64)
+        priv, pub = homo_generateKeyPair(128)
         sk = priv
         pk = pub
         
@@ -141,7 +142,7 @@ def stepOne_ab():
     # encrypt fi
     fi_enc = homo_encrypt_poly(pk, fi)
     fi_enc_dic[myNodeNum]= fi_enc   # store into fi_enc_dic
-    print "fi_enc:", fi_enc
+    #print "fi_enc:", fi_enc
     # create new message fi
     
     # send encrypt fi to i+1 ... i+c
@@ -166,7 +167,7 @@ def stepOne_cd():
     degree = k_set_size
     r = []
     # for num from received
-    print "fi_enc_dic = ", fi_enc_dic.keys()
+    #print "fi_enc_dic = ", fi_enc_dic.keys()
     for num in fi_enc_dic.keys():
         r = []
         for d in range(0,degree+1):
@@ -183,7 +184,8 @@ def stepOne_cd():
         fxr_tmp = homo_mult_poly(pk,f_tmp, r_tmp)
         theta_coef = homo_add_poly(fxr_tmp, theta_coef)
     theta = theta_coef
-    print "theta = ", theta
+    #print "theta = ", theta
+    print "calculated my theta"
     # send to node one,for done step 1cd
     rplyMsg = createRplyMsg('Rply_theta_created', 1)
     netsocket.sendto(rplyMsg, peerDic[1])    
@@ -211,25 +213,35 @@ def stepTwo():
 def stepFive_ab(lambda_n):
     # evaluate encryption to get E(cij) = p((Si)j)
     print "[Step 5 ab]"
-    print "lambda_n:",lambda_n
+    #print "lambda_n:",lambda_n
     print "s_set:",s_set
+    print "fi_enc_dic:", fi_enc_dic
     cij_list = []
     vij_list = []
+    vij_dec_list = []
     for j in range(0, k_set_size):
         cij_list.append(0)
         vij_list.append(0)
-    
+        vij_dec_list.append(0)
     for j in range(0, k_set_size):
         cij_list[j]= homo_evalutate(pk, lambda_n, s_set[j])
     
-    print 'cij_list:', cij_list
+    #print 'cij_list:', cij_list
     
     # for j = 1 to k, choose rij <- R, 
     # evaluate (Vi)j = rijxh E(cij)
+    
     for j in range (0, k_set_size):
         r_rand=num = randint(0,100)
         vij_list[j] = homo_mult(pk, cij_list[j], r_rand)
     print 'vij_list:',vij_list
+    
+    for j in range (0, k_set_size):
+        '''for test'''
+        vij_dec_list[j] = homo_decrypt(sk, pk, vij_list[j])
+        
+    print "vij_dec_list:", vij_dec_list
+    
     #send reply to node 1
     rply_vset_msg = createRplyMsg('Got_Vset', 1)
     netsocket.sendto(rply_vset_msg,peerDic[1])
@@ -464,7 +476,7 @@ def processReplyMsg(msgdict, origin_addr):
             stepTwo()
     if replyText == 'Got_Vset' and myNodeNum == 1:
         reply_check_plist.append(originNum)
-        if len(reply_check_plist) == n_hbc:
+        if len(reply_check_plist) == n_hbc + 1:
             print "All nodes computed V set. Next shuffle."
             reply_check_plist = []
             startShuffle()
@@ -605,6 +617,31 @@ def mainLoop():
                     #@@@ testcode
                     '''
                     print "------test--------"
+                         
+                    test_list2 =   [  125,  684, 1]
+                    print "test list2:", test_list2
+                    for test_index in range(0, len(test_list2)):
+                        try:
+                            enc = homo_encrypt(pk, int(test_list2[test_index]))
+                            print test_list2[test_index], ":",enc, ":",homo_decrypt(sk, pk,enc)
+                        except:
+                            print "error"
+                    
+                    test_list1= np.poly1d([2,1,3,6,3],True).c
+                    print "test list1:", test_list1
+                    for test_index in range(0, len(test_list1)):
+                        # create socket
+                        try:
+                            enc = homo_encrypt(pk, int(test_list1[test_index]))
+                            print test_list1[test_index], ":", enc, ":",homo_decrypt(sk, pk,enc)
+                   
+                        #print newsocket.getsockname()
+                        except:
+                            print "error"
+                    print "homo_enc_poly:",homo_encrypt_poly(pk, test_list1)
+                    '''
+                    
+                    '''
                     sum = homo_add_poly([homo_encrypt(pk,4),homo_encrypt(pk,3),homo_encrypt(pk,2),homo_encrypt(pk,1)], [homo_encrypt(pk,2),homo_encrypt(pk,1)])
                     print "sum = "
                     for p in sum:
@@ -620,8 +657,11 @@ def mainLoop():
                     ppoly = homo_mult_poly(pk, [homo_encrypt(pk,3),homo_encrypt(pk,2),homo_encrypt(pk,1)], [3,2,1])
                     for p in ppoly:
                         print homo_decrypt(sk, pk,p )
+                        '''
+                    '''
                     print "----------------"
                     '''
+                    
                     broadcastPeerListandKeys()
                     
 
