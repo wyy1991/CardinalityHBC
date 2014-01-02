@@ -451,14 +451,22 @@ def processPolyMsg(msgdict):
     
     if targetNum != myNodeNum:
         return 
-    if polytype == 'Lambda' and originNum == myNodeNum -1:
+    if polytype == 'Lambda' and originNum == myNodeNum-1 and myNodeNum != 1:
         lambda_other = poly
         #lambda = lambda other + theta  (encrypted)
         lambda_my = homo_add_poly(lambda_other, theta)
         #send the encryption to  player i+1 mod n
         tar = (myNodeNum + 1) % n_hbc
         theta_out_msg =  createPolyMsg(lambda_my,'Lambda', tar)
-        
+        print "Send theta out to node ",tar
+        netsocket.send(theta_out_msg, peerDic[tar])
+    elif polytype == 'Lambda' and originNum == myNodeNum-1 and myNodeNum == 1:
+        #when node 1 receives lambda n, it sends out to all other players
+        lambda_n = poly
+        print "Send lambda N to all peers"
+        for tar in range(1, n_hbc+1):
+            lambda_n_out_msg = createPolyMsg(lambda_n , 'Lambda_N', tar)
+            netsocket.send(lambda_n_out_msg, peerDic[tar])
         
         
 #--------processPendingMsg-----------------------------------------------------    
