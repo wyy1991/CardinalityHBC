@@ -57,8 +57,8 @@ def homo_affine(pub, ciphertext, a, b):
 def homo_encrypt_poly(pub, f):
     # encrypt a f[]
     f_enc = []
-    for val in f:
-        f_enc.append(homo_encrypt(pub,val))
+    for val in range(0,len(f)):
+        f_enc.append(homo_encrypt(pub,f[val]))
     return f_enc
 def homo_add_poly(f1, f2):
     # return E(g[i]) = E(f1) + E(f2)
@@ -187,6 +187,7 @@ def stepOne_cd():
     # send to node one,for done step 1cd
     rplyMsg = createRplyMsg('Rply_theta_created', 1)
     netsocket.sendto(rplyMsg, peerDic[1])    
+    
         
 #--------stepTwo-----------------------------------------------------
 def stepTwo():
@@ -197,20 +198,25 @@ def stepTwo():
         return 
     print "Start step two."
     # lambda = encrypted theta  
-    lambda_my = homo_encrypt_poly(pk, theta)
+    #lambda_my = homo_encrypt_poly(pk, theta)
+    lambda_my = theta
     # send lambda
     lambdaMsg = createPolyMsg(lambda_my,'Lambda', myNodeNum+1)
     netsocket.sendto(lambdaMsg, peerDic[myNodeNum+1]) # should send to node 2
-    print "Send lambda 1"
+    print "Send lambda 1 to node", myNodeNum+1
 
 
 
 def stepFive_ab(lambda_n):
     # evaluate encryption to get E(cij) = p((Si)j)
+    print "[Step 5 ab]"
     cij_list = []
     vij_list = []
-    for j in range(0, k_set_size+1):
+    for j in range(0, k_set_size +1):
         cij_list.append(0)
+        vij_list.append(0)
+    
+    for j in range(0, k_set_size+1):
         cij_list[j]= homo_evalutate(pk, lambda_n, s_set[j])
     
     print 'cij_list:', cij_list
@@ -431,19 +437,19 @@ def processReplyMsg(msgdict, origin_addr):
             print "All nodes received plist and keys."
             #send out command for Step 1ab to all peer including me
             for tar in range(1,n_hbc+1):
+                reply_check_plist = []
                 commandMsg = createCommandMsg('Start_Step_1ab',myNodeNum,tar)
                 netsocket.sendto(commandMsg,peerDic[tar])
             #@@@ Node 1 can start Step 1b
 
     
     # when first node receives all reply from all nodes about theta created 
-    if replyText == '' and myNodeNum == 1:
+    if replyText == 'Rply_theta_created' and myNodeNum == 1:
         reply_check_plist.append(originNum)
         if len(reply_check_plist) == n_hbc-1:
             print "All nodes computed theta."
             # node one start step two 
-            for tar in range(1,n_hbc+1):
-                stepTwo(theta)
+            stepTwo()
          
         
 
@@ -481,26 +487,32 @@ def processPolyMsg(msgdict):
     
     if targetNum != myNodeNum:
         return 
-    if polytype == 'Lambda' and originNum == myNodeNum-1 and myNodeNum != 1:
+    if polytype == 'Lambda' and targetNum == myNodeNum and originNum == myNodeNum-1 and myNodeNum != 1:
         lambda_other = poly
         #lambda = lambda other + theta  (encrypted)
         lambda_my = homo_add_poly(lambda_other, theta)
         #send the encryption to  player i+1 mod n
-        tar = (myNodeNum + 1) % n_hbc
+        print "myNodeNum = ",myNodeNum,"n_hbc = ",n_hbc 
+        tar = (myNodeNum + 1)
+        if tar > n_hbc:
+            tar = tar - n_hbc
         theta_out_msg =  createPolyMsg(lambda_my,'Lambda', tar)
         print "Send theta out to node ",tar
-        netsocket.send(theta_out_msg, peerDic[tar])
-    elif polytype == 'Lambda' and originNum == myNodeNum-1 and myNodeNum == 1:
+        netsocket.sendto(theta_out_msg, peerDic[tar])
+        print "theta_out_msg send!"
+    elif polytype == 'Lambda' and targetNum == myNodeNum and myNodeNum == 1:
         #when node 1 receives lambda n, it sends out to all other players
         lambda_n = poly
         print "Send lambda N to all peers."
         for tar in range(1, n_hbc+1):
             lambda_n_out_msg = createPolyMsg(lambda_n , 'Lambda_N', tar)
-            netsocket.send(lambda_n_out_msg, peerDic[tar])
+            netsocket.sendto(lambda_n_out_msg, peerDic[tar])
     elif polytype == 'Lambda_N' and originNum == 1:
         print "Got Lambda_N"
         # step 5
         stepFive_ab(poly)
+    else:
+        return 
         
 #--------processPendingMsg-----------------------------------------------------    
 def processPendingMsg(rawmsg, origin_addr):
