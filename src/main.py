@@ -109,6 +109,20 @@ def homo_mult_poly(pub, f1_enc, f2):
             elif 0!=e_mult:
                 g[deg_g - bigi] = homo_add(pub, g[deg_g - bigi], e_mult)
     return g
+
+
+def homo_evalutate(pub, f1_enc, b):
+    # return E(a) = fi_enc plug in b
+    a_enc = 0
+    deg_f1 = len(f1_enc)-1
+    for k in range (0, deg_f1+1):
+        bpower = b**k
+        tmp = homo_mult(pk, f1_enc[deg_f1 - k], bpower)
+        if a_enc == 0:
+            a_enc = tmp
+        else:
+            a_enc = homo_add(pub, a_enc, tmp)
+    return a_enc
 #--------broadcastPeerList-----------------------------------------------------
 def generateKeyPair():    
     global sk
@@ -189,10 +203,26 @@ def stepTwo():
     netsocket.sendto(lambdaMsg, peerDic[myNodeNum+1]) # should send to node 2
     print "Send lambda 1"
 
-def computeMyLambda():
-    #lambda = encrypted theta
+
+
+def stepFive_ab(lambda_n):
+    # evaluate encryption to get E(cij) = p((Si)j)
+    cij_list = []
+    vij_list = []
+    for j in range(0, k_set_size+1):
+        cij_list.append(0)
+        cij_list[j]= homo_evalutate(pk, lambda_n, s_set[j])
     
-    return 0
+    print 'cij_list:', cij_list
+    
+    # for j = 1 to k, choose rij <- R, 
+    # evaluate (Vi)j = rijxh E(cij)
+    for j in range (0, k_set_size+1):
+        r_rand=num = randint(0,100)
+        vij_list[j] = homo_mult(pk, cij_list[j], r_rand)
+    print 'vij_list:',vij_list
+    
+    
 #--------initLocalSet-----------------------------------------------------
 def initLocalSet():
     global s_set
@@ -463,11 +493,14 @@ def processPolyMsg(msgdict):
     elif polytype == 'Lambda' and originNum == myNodeNum-1 and myNodeNum == 1:
         #when node 1 receives lambda n, it sends out to all other players
         lambda_n = poly
-        print "Send lambda N to all peers"
+        print "Send lambda N to all peers."
         for tar in range(1, n_hbc+1):
             lambda_n_out_msg = createPolyMsg(lambda_n , 'Lambda_N', tar)
             netsocket.send(lambda_n_out_msg, peerDic[tar])
-        
+    elif polytype == 'Lambda_N' and originNum == 1:
+        print "Got Lambda_N"
+        # step 5
+        stepFive_ab(poly)
         
 #--------processPendingMsg-----------------------------------------------------    
 def processPendingMsg(rawmsg, origin_addr):
