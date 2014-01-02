@@ -207,6 +207,7 @@ def stepTwo():
 
 
 
+#--------stepFive_ab-----------------------------------------------------
 def stepFive_ab(lambda_n):
     # evaluate encryption to get E(cij) = p((Si)j)
     print "[Step 5 ab]"
@@ -229,7 +230,15 @@ def stepFive_ab(lambda_n):
         r_rand=num = randint(0,100)
         vij_list[j] = homo_mult(pk, cij_list[j], r_rand)
     print 'vij_list:',vij_list
+    #send reply to node 1
+    rply_vset_msg = createRplyMsg('Got_Vset', 1)
+    netsocket.sendto(rply_vset_msg,peerDic[1])
+    print 'Send vset reply msg to node 1'
     
+#--------startShuffle----------------------------------------------------
+def startShuffle():
+    # todo
+    return 0
     
 #--------initLocalSet-----------------------------------------------------
 def initLocalSet():
@@ -443,16 +452,22 @@ def processReplyMsg(msgdict, origin_addr):
                 commandMsg = createCommandMsg('Start_Step_1ab',myNodeNum,tar)
                 netsocket.sendto(commandMsg,peerDic[tar])
             #@@@ Node 1 can start Step 1b
-
+            
     
     # when first node receives all reply from all nodes about theta created 
     if replyText == 'Rply_theta_created' and myNodeNum == 1:
         reply_check_plist.append(originNum)
         if len(reply_check_plist) == n_hbc-1:
             print "All nodes computed theta."
+            reply_check_plist = []
             # node one start step two 
             stepTwo()
-         
+    if replyText == 'Got_Vset' and myNodeNum == 1:
+        reply_check_plist.append(originNum)
+        if len(reply_check_plist) == n_hbc:
+            print "All nodes computed V set. Next shuffle."
+            reply_check_plist = []
+            startShuffle()
         
 
 #--------processCommandMsg-----------------------------------------------------
