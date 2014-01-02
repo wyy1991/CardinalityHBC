@@ -25,6 +25,8 @@ reply_check_plist = []
 fi_enc_dic = {} # dictionary of <node num, list of fi_enc's coeff[]>
 r_set = {} # <nodeNum, list of r's coeff[]> 
 theta = []
+lambda_my = []
+reply_check_theta_list = []
 #---parameters
 n_hbc = 0 # n>2 number of hbc
 c_collude = 2 # c<n, dishonesty colluding peers
@@ -52,6 +54,12 @@ def homo_affine(pub, ciphertext, a, b):
     #Returns E(a*m + b) given E(m), a and b.
     a_mult_ciphertext = pow(ciphertext, a, pub.n_sq)
     return a_mult_ciphertext * pow(pub.g, b, pub.n_sq) % pub.n_sq
+def homo_encrypt_poly(pub, f):
+    # encrypt a f[]
+    f_enc = []
+    for val in f:
+        f_enc.append(homo_encrypt(pub,val))
+    return f_enc
 def homo_add_poly(f1, f2):
     # return E(g[i]) = E(f1) + E(f2)
     g = []
@@ -117,10 +125,8 @@ def stepOne_ab():
     fi = np.poly1d(s_set,True).c
     print "fi:",fi
     # encrypt fi
-    fi_enc = []
-    for val in fi:
-        fi_enc.append(homo_encrypt(pk,val))
-    fi_enc_dic[myNodeNum]=fi_enc    # store into fi_enc_dic
+    fi_enc = homo_encrypt_poly(pk, fi)
+    fi_enc_dic[myNodeNum]= fi_enc   # store into fi_enc_dic
     print "fi_enc:", fi_enc
     # create new message fi
     
@@ -164,9 +170,29 @@ def stepOne_cd():
         theta_coef = homo_add_poly(fxr_tmp, theta_coef)
     theta = theta_coef
     print "theta = ", theta
+    # send to node one,for done step 1cd
+    rplyMsg = createRplyMsg('Rply_theta_created', 1)
+    netsocket.sendto(rplyMsg, peerDic[1])    
         
-        
+#--------stepTwo-----------------------------------------------------
+def stepTwo():
+    global lambda_my
+    # only for step number 
+    if myNodeNum != 1:
+        print 'step two only for node one.'
+        return 
+    print "Start step two."
+    # lambda = encrypted theta  
+    lambda_my = homo_encrypt_poly(pk, theta)
+    # send lambda
+    lambdaMsg = createPolyMsg(lambda_my,'Lambda', myNodeNum+1)
+    netsocket.sendto(lambdaMsg, peerDic[myNodeNum+1]) # should send to node 2
+    print "Send lambda 1"
+
+def computeMyLambda():
+    #lambda = encrypted theta
     
+    return 0
 #--------initLocalSet-----------------------------------------------------
 def initLocalSet():
     global s_set
@@ -239,6 +265,14 @@ def createRplyNodeNumMsg(n):
     msgStr=json.dumps(msgDic)
     return msgStr
 
+#--------createPolyMsg-----------------------------------------------------
+def createPolyMsg(f,polytype, targetNum):
+    msgDic = {'PolyType':polytype,
+              'Poly':f,
+              'OriginNum':myNodeNum,
+              'TargetNum':targetNum}
+    msgStr=json.dumps(msgDic)
+    return msgStr
 
 #--------createPeerListMsg-----------------------------------------------------
 def createPeerListMsg():
@@ -370,7 +404,18 @@ def processReplyMsg(msgdict, origin_addr):
                 commandMsg = createCommandMsg('Start_Step_1ab',myNodeNum,tar)
                 netsocket.sendto(commandMsg,peerDic[tar])
             #@@@ Node 1 can start Step 1b
-            
+
+    
+    # when first node receives all reply from all nodes about theta created 
+    if replyText == '' and myNodeNum == 1:
+        reply_check_plist.append(originNum)
+        if len(reply_check_plist) == n_hbc-1:
+            print "All nodes computed theta."
+            # node one start step two 
+            for tar in range(1,n_hbc+1):
+                stepTwo(theta)
+         
+        
 
 #--------processCommandMsg-----------------------------------------------------
 def processCommandMsg(msgdict):
@@ -394,6 +439,28 @@ def processFiEncMsg(msgdict):
     #check if received enough to go to next step
     if len(fi_enc_dic) >= c_collude+1:  # add the one from self
         stepOne_cd()
+
+#--------processPolyMsg-----------------------------------------------------         
+def processPolyMsg(msgdict):
+    global lambda_my
+    # process 
+    poly = msgdict['Poly']
+    polytype = msgdict['PolyType']
+    originNum = msgdict['OriginNum']
+    targetNum = msgdict['TargetNum']
+    
+    if targetNum != myNodeNum:
+        return 
+    if polytype == 'Lambda' and originNum == myNodeNum -1:
+        lambda_other = poly
+        #lambda = lambda other + theta  (encrypted)
+        lambda_my = homo_add_poly(lambda_other, theta)
+        #send the encryption to  player i+1 mod n
+        tar = (myNodeNum + 1) % n_hbc
+        theta_out_msg =  createPolyMsg(lambda_my,'Lambda', tar)
+        
+        
+        
 #--------processPendingMsg-----------------------------------------------------    
 def processPendingMsg(rawmsg, origin_addr):
     print "received from address", origin_addr
@@ -411,6 +478,8 @@ def processPendingMsg(rawmsg, origin_addr):
         processCommandMsg(msgdict)
     if 'Fi_enc' in msgdict and 'TargetNum' in msgdict and 'OriginNum' in msgdict:
         processFiEncMsg(msgdict)
+    if 'PolyType' in msgdict and 'Poly' in msgdict and 'OriginNum' in msgdict and 'TargetNum' in msgdict:
+        processPolyMsg(msgdict)
     
 #--------broadcastPeerList-----------------------------------------------------
 def broadcastPeerListandKeys():
