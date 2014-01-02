@@ -210,20 +210,22 @@ def stepTwo():
 def stepFive_ab(lambda_n):
     # evaluate encryption to get E(cij) = p((Si)j)
     print "[Step 5 ab]"
+    print "lambda_n:",lambda_n
+    print "s_set:",s_set
     cij_list = []
     vij_list = []
-    for j in range(0, k_set_size +1):
+    for j in range(0, k_set_size):
         cij_list.append(0)
         vij_list.append(0)
     
-    for j in range(0, k_set_size+1):
+    for j in range(0, k_set_size):
         cij_list[j]= homo_evalutate(pk, lambda_n, s_set[j])
     
     print 'cij_list:', cij_list
     
     # for j = 1 to k, choose rij <- R, 
     # evaluate (Vi)j = rijxh E(cij)
-    for j in range (0, k_set_size+1):
+    for j in range (0, k_set_size):
         r_rand=num = randint(0,100)
         vij_list[j] = homo_mult(pk, cij_list[j], r_rand)
     print 'vij_list:',vij_list
@@ -235,7 +237,7 @@ def initLocalSet():
     for i in range(0,k_set_size):
         num = (int(time.time()*1000) + randint(0,10))%10
         s_set.append(num)
-    print s_set
+    print "s_set:",s_set
     
 #--------create socket-----------------------------------------------------
 def createSocket():
