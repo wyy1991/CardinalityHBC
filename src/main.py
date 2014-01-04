@@ -22,6 +22,7 @@ peerDic = {}
 myNodeNum = 0
 firstNodeStatus = ''  # "WaitForPeers"  "StopAcceptingPeers" "StartComputing"
 reply_check_plist = []
+fi = []
 fi_enc_dic = {} # dictionary of <node num, list of fi_enc's coeff[]>
 r_set = {} # <nodeNum, list of r's coeff[]> 
 theta = []
@@ -30,7 +31,7 @@ reply_check_theta_list = []
 #---parameters
 n_hbc = 0 # n>2 number of hbc
 c_collude = 2 # c<n, dishonesty colluding peers
-k_set_size = 5 # set size
+k_set_size = 4 # set size
 s_set = list() #local set
 sk = None # private key
 pk = None # public key
@@ -152,6 +153,7 @@ def readInFile(nodeNum):
 #--------stepOne_ab-----------------------------------------------------
 def stepOne_ab():
     global fi_enc_dic
+    global fi
     # calculate polynomial fi
     fi = np.poly1d(s_set,True).c
     print "fi:",fi
@@ -187,7 +189,7 @@ def stepOne_cd():
     for num in fi_enc_dic.keys():
         r = []
         for d in range(0,degree+1):
-            r.append((int(time.time()*1000) + randint(0,10))%100)
+            r.append(randint(1,100))
         r_set[num] = r
     print "r_set = ",r_set
     
@@ -231,24 +233,31 @@ def stepFive_ab(lambda_n):
     print "[Step 5 ab]"
     #print "lambda_n:",lambda_n
     print "s_set:",s_set
-    print "fi_enc_dic:", fi_enc_dic
+    print "fi:",fi
+    #print "fi_enc_dic:", fi_enc_dic
     cij_list = []
     vij_list = []
+    cij_dec_list = []
     vij_dec_list = []
+    # init list size
     for j in range(0, k_set_size):
         cij_list.append(0)
         vij_list.append(0)
+        cij_dec_list.append(0)
         vij_dec_list.append(0)
+    # compute cij, by eacluating lambda_n
     for j in range(0, k_set_size):
         cij_list[j]= homo_evalutate(pk, lambda_n, s_set[j])
     
-    #print 'cij_list:', cij_list
+    for j in range(0, k_set_size):
+        cij_dec_list[j] = homo_decrypt(sk, pk, cij_list[j])
+    print 'cij_dec_list:', cij_dec_list
     
     # for j = 1 to k, choose rij <- R, 
     # evaluate (Vi)j = rijxh E(cij)
     
     for j in range (0, k_set_size):
-        r_rand=num = randint(0,100)
+        r_rand=num = randint(1,100)
         vij_list[j] = homo_mult(pk, cij_list[j], r_rand)
     print 'vij_list:',vij_list
     
@@ -422,6 +431,8 @@ def processRplyNodeNumMsg(msgdict):
         #insert into peerdic
         peerDic[myNodeNum] = peerDic[0]
         print "My node num is :", myNodeNum
+        # local set init for none first node
+        initLocalSet()
 
 #--------processPeerListMsg-----------------------------------------------------  
 def processPeerListMsg(msgdict):
@@ -459,8 +470,7 @@ def processPeerListMsg(msgdict):
     print "UpdatedPeerList"
     print peerDic
     
-     # local set init for none first node
-    initLocalSet()
+    
     
     #send reply to node one
     pListRplyMsg = createRplyMsg('Received_PList_Keys',1)
