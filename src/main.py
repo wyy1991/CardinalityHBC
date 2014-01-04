@@ -133,6 +133,22 @@ def generateKeyPair():
         sk = priv
         pk = pub
         
+
+#--------read in file-----------------------------------------------------
+def readInFile(nodeNum):
+    
+    fileName = 'file'+str(nodeNum)
+    file = open(fileName, 'r')
+    val_list  = []
+    size = 0
+    for line in file:
+        val_list.append(int(line))
+        size = size +1
+        if size == k_set_size:
+            break
+    file.close()
+    return val_list
+    
 #--------stepOne_ab-----------------------------------------------------
 def stepOne_ab():
     global fi_enc_dic
@@ -255,9 +271,12 @@ def startShuffle():
 #--------initLocalSet-----------------------------------------------------
 def initLocalSet():
     global s_set
+    '''
     for i in range(0,k_set_size):
         num = (int(time.time()*1000) + randint(0,10))%10
         s_set.append(num)
+    '''
+    s_set = readInFile(myNodeNum)
     print "s_set:",s_set
     
 #--------create socket-----------------------------------------------------
@@ -440,6 +459,9 @@ def processPeerListMsg(msgdict):
     print "UpdatedPeerList"
     print peerDic
     
+     # local set init for none first node
+    initLocalSet()
+    
     #send reply to node one
     pListRplyMsg = createRplyMsg('Received_PList_Keys',1)
     netsocket.sendto(pListRplyMsg,peerDic[1])
@@ -618,7 +640,7 @@ def mainLoop():
                     '''
                     print "------test--------"
                          
-                    test_list2 =   [  125,  684, 1]
+                    test_list2 =   [  125,  684, 1, 0 ]
                     print "test list2:", test_list2
                     for test_index in range(0, len(test_list2)):
                         try:
@@ -627,7 +649,7 @@ def mainLoop():
                         except:
                             print "error"
                     
-                    test_list1= np.poly1d([2,1,3,6,3],True).c
+                    test_list1= np.poly1d([2,1,3,0 ,6,3],True).c
                     print "test list1:", test_list1
                     for test_index in range(0, len(test_list1)):
                         # create socket
@@ -639,8 +661,8 @@ def mainLoop():
                         except:
                             print "error"
                     print "homo_enc_poly:",homo_encrypt_poly(pk, test_list1)
-                    '''
                     
+                    '''
                     '''
                     sum = homo_add_poly([homo_encrypt(pk,4),homo_encrypt(pk,3),homo_encrypt(pk,2),homo_encrypt(pk,1)], [homo_encrypt(pk,2),homo_encrypt(pk,1)])
                     print "sum = "
@@ -680,8 +702,7 @@ def main():
     global firstNodeStatus 
     
     iamNodeOne = isFirstNode()
-    # local computation
-    initLocalSet()
+   
     # create socket
     createSocket()
     #myip = getPublicIp()
@@ -696,6 +717,7 @@ def main():
         myNodeNum = 1
         firstNodeStatus = "WaitForPeers"
         peerDic[1] = (myip, myport)
+        initLocalSet()
     else:
         enterFirstNodeAddr()
         print "First node set."
