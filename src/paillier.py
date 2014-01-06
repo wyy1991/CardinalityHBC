@@ -18,7 +18,7 @@ import logging
 import common_crypto as ccrypto
 
 
-N_LENGTH = 1024  # bits
+N_LENGTH = 128  # bits
 HALF_N_LENGTH = N_LENGTH / 2  # bits
 MAX_INT64 = (2 ** 63) -1
 MIN_INT64 = -(2 ** 63)
@@ -29,22 +29,14 @@ _ONES_96 = long(96*'1', 2)
 _ONES_832 = long(832*'1', 2)
 # Bit positions of various sections in expanded float representation created
 # from an IEEE float value; (assumes starting bit is numbered as 1).
-FLOAT_MSB = N_LENGTH - 1  # 1023 (here & below comments, N_lENGTH assumed 1024).
+
 MAX_ADDS = 32  # (bits) i.e. if < 2^32 adds occur than overflow can be detected
-FLOAT_NAN_LSB = FLOAT_MSB - MAX_ADDS  # 991
-FLOAT_PLUSINF_LSB = FLOAT_NAN_LSB - MAX_ADDS  # 959
-FLOAT_MINUSINF_LSB = FLOAT_PLUSINF_LSB - MAX_ADDS  # 927
-FLOAT_CARRYOVER_LSB = FLOAT_MINUSINF_LSB - MAX_ADDS  # 895
-FLOAT_SIGN_HIGH_LSB = FLOAT_CARRYOVER_LSB - MAX_ADDS  # 863
-FLOAT_SIGN_LOW_LSB = FLOAT_SIGN_HIGH_LSB - MAX_ADDS  # 831
+
 EXPLICIT_MANTISSA_BITS = 52
 MANTISSA_BITS = 53
 EXPONENT_BITS = 11
 EXPONENT_BIAS = (2 ** (EXPONENT_BITS - 1)) - 1  # 1023 for 11 bit exponent
-FLOAT_MANTISSA_LSB = FLOAT_SIGN_LOW_LSB - MANTISSA_BITS  # 778
-FLOAT_MANTISSA_ZERO = FLOAT_MANTISSA_LSB / 2  # 389
-_ONES_CARRYOVER_LSB = long('1' * FLOAT_CARRYOVER_LSB, 2)
-_ONES_FLOAT_SIGN_LOW_LSB = long('1' * FLOAT_SIGN_LOW_LSB, 2)
+
 
 # -- openssl function args and return types
 _FOUND_SSL = False
@@ -288,169 +280,6 @@ class Paillier(object):
     #   which gives 64 bit value 2^63.
     positive_64bit_value = positive_96bit_value & _ONES_64
     return -1 * positive_64bit_value
-
-  def EncryptFloat(self, plaintext, r_value=None):
-    """Encrypt float (IEEE754 binary64bit) values with limited exponents.
-
-    Paillier homomorphic addition only directly adds positive binary values,
-    however, we would like to add both positive and negative float values
-    of different magnitutes. To achieve this, we will:
-    - represent the mantissa and exponent as one long binary value. This means
-      that with 1024 bit n in paillier, the maximum exponent value is 389 bits.
-    - represent negative values with twos complement representation.
-    - Nan, +inf, -inf are each indicated by values in there own 32 bit region,
-      so that when one of them is added, the appropriate region would be
-      incremented and we would know this in the final aggregated value, assuming
-      less than 2^32 values were aggregated.
-    - We limit the number of numbers that can be added to be less than 2^32
-      otherwise we would not be able to detect overflows properly, etc.
-    - Also, in order to detect overflow after adding multiple values,
-      the 64 sign bit is extended (or replicated) for an additional 64 bits.
-      This allows us to detect if an overflow happened and knowing whether the
-      most significant 32 bits out of 64 is zeroes or ones, we would know if the
-      result should be a +inf or -inf.
-
-    Args:
-      plaintext: a float to be paillier encrypted, Supported float values
-        have exponent <= 389.
-      r_value: random value used in encryption, in default case (i.e None) the
-        value is supplied by the method.
-
-    Returns:
-      a long, representing paillier encryption of a float plaintext.
-
-    Raises:
-      ValueError: if plaintext is not a float.
-    """
-    if not isinstance(plaintext, float):
-      raise ValueError('Expected float plaintext but got: %s' % type(plaintext))
-
-    input_as_long = struct.unpack('Q', struct.pack('d', plaintext))[0]
-    mantissa = (input_as_long & 0xfffffffffffff) | 0x10000000000000
-    exponent = ((input_as_long >> 52) & 0x7ff) - EXPONENT_BIAS
-    sign = input_as_long >> (EXPLICIT_MANTISSA_BITS + EXPONENT_BITS)
-    if IsNan(plaintext):
-      # Put a 1 in the 32 bit nan indicator field.
-      plaintext = 0x00000001 << FLOAT_NAN_LSB  # << 991
-    elif IsInfPlus(plaintext):
-      # Put a 1 in the 32 bit plus inf indicator field.
-      plaintext = 0x00000001 << FLOAT_PLUSINF_LSB  # << 959
-    elif IsInfMinus(plaintext):
-      # Put a 1 in the 32 bit minus inf indicator field.
-      plaintext = 0x00000001 << FLOAT_MINUSINF_LSB  # << 927
-    elif exponent == 0 and mantissa == 0:  # explicit 0
-      plaintext = 0
-    elif exponent > FLOAT_MANTISSA_ZERO:  # > 389
-      # Can't represent such large numbers
-      raise ValueError('Floats with exponents larger than 389 are currently '
-                       'not suppported.')
-    elif exponent < -FLOAT_MANTISSA_ZERO - EXPLICIT_MANTISSA_BITS:  # < -389 -52
-      # too small, set to zero
-      plaintext = 0
-    else:  # representable numbers with -441 <= exponent <= 389.
-      # Place 53 bit mantissa (1 + 52 explicit bit mantissa in 831 bit payload
-      # and shift according to exponent.
-      # - first put 53 bit mantissa on the left most side of payload
-      plaintext = mantissa << FLOAT_MANTISSA_LSB  # << 778
-      # - second shift right as needed.
-      plaintext >>= (FLOAT_MANTISSA_ZERO - exponent)  # >>= (389 - exponent)
-      # Find 2s complement if number is negative
-      if sign == 1:  # neg number
-        # make 895 bit (831 + 64 extended sign bits) 2s complement
-        plaintext = (plaintext  ^ _ONES_CARRYOVER_LSB) + 1L
-    return self.Encrypt(plaintext, r_value=r_value)
-
-  def DecryptFloat(self, ciphertext):
-    """Paillier decryption of ciphertext into a IEEE754 binary64 float value.
-
-    Args:
-      ciphertext: a long that is to be paillier decrypted into a float.
-
-    Returns:
-      a float representing paillier decryption of ciphertext into an float value
-
-    Raises:
-      ValueError: if nan, +inf or -inf is not set correctly in decrypted value.
-    """
-    original_plaintext = self.Decrypt(ciphertext)
-    plaintext = original_plaintext
-    mantissa_and_exponent = plaintext & _ONES_FLOAT_SIGN_LOW_LSB
-    plaintext >>= FLOAT_SIGN_LOW_LSB  # >>= 831
-    sign_low32 = plaintext & 0xffffffff
-    plaintext >>= 32
-    sign_high32 = plaintext & 0xffffffff
-    plaintext >>= 32
-    # carry_over32 = plaintext & 0xffffffff
-    plaintext >>= 32
-    minus_inf32 = plaintext & 0xffffffff
-    plaintext >>= 32
-    plus_inf32 = plaintext & 0xffffffff
-    plaintext >>= 32
-    nan_32 = plaintext & 0xffffffff
-    if nan_32 > 0:
-      return float('nan')
-    # adding a +inf and -inf should return a nan
-    if plus_inf32 > 0 and minus_inf32 > 0:
-      return float('nan')
-    if plus_inf32 > 0:
-      return float('inf')
-    if minus_inf32 > 0:
-      return float('-inf')
-    if sign_high32 == 0 and sign_low32 > 0:
-      # This indicates that positive overflow has happened, mimic ieee float
-      # behaviour and return +inf.
-      return float('inf')
-    if sign_high32 == 0xffffffff and sign_low32 < 0xffffffff:
-      # This indicates that negative overflow has happened, mimic ieee float
-      # behaviour and return -inf.
-      return float('-inf')
-    if sign_high32 == 0 and sign_low32 == 0:
-      # positive finite number.
-      if mantissa_and_exponent == 0L:
-        return float(0)
-      size = len(bin(mantissa_and_exponent)) - 2  # -2 to remove prepended 0b
-      if size >= MANTISSA_BITS:
-        # take the first 53 bits and remove the leading 1 bit i.e 52 bits.
-        new_mantissa = ((mantissa_and_exponent >> (size - MANTISSA_BITS))
-                        & 0xfffffffffffff)
-      else:
-        # take all the bits and shift left to make it a normal number,
-        # the exponent also gets updated appropriately.
-        new_mantissa = ((mantissa_and_exponent << (MANTISSA_BITS - size))
-                        & 0xfffffffffffff)
-      new_exponent = ((size - MANTISSA_BITS) - FLOAT_MANTISSA_ZERO +
-                      EXPONENT_BIAS)
-      new_value = (new_exponent << EXPLICIT_MANTISSA_BITS) | new_mantissa
-      return struct.unpack('d', struct.pack('Q', new_value))[0]
-    if sign_high32 == 0xffffffff and sign_low32 == 0xffffffff:
-      # negative finite number.
-      # - first find the positive value of the number by taking the 2s
-      # complement of the 895 bit integer.
-      num = original_plaintext & _ONES_CARRYOVER_LSB
-      positive_895bit_value = (num ^ _ONES_CARRYOVER_LSB) + 1L
-      # - final value will mostly be a 831 bit number or smaller except if
-      # 831 bits are all zero which represents -2^831 and gives a 2's complement
-      # positive value of 2^831, we detect this case and return -inf.
-      positive_832bit_value = positive_895bit_value & _ONES_832
-      if positive_832bit_value >> FLOAT_SIGN_LOW_LSB:  # >> 831:
-        return float('-inf')
-      size = len(bin(positive_832bit_value)) - 2
-      if size >= MANTISSA_BITS:
-        # take the first 53 bits and remove the leading 1 bit.
-        new_mantissa = ((positive_832bit_value >> (size - MANTISSA_BITS))
-                        & 0xfffffffffffff)
-      else:
-        # take all the bits and shift left to make it a normal number,
-        # the exponent also gets updated appropriately.
-        new_mantissa = ((positive_832bit_value << (MANTISSA_BITS - size))
-                        & 0xfffffffffffff)
-      new_exponent = ((size - MANTISSA_BITS) - FLOAT_MANTISSA_ZERO +
-                      EXPONENT_BIAS)
-      new_value = ((new_exponent << EXPLICIT_MANTISSA_BITS) | new_mantissa |
-                   (1 << (EXPLICIT_MANTISSA_BITS + EXPONENT_BITS)))
-      return struct.unpack('d', struct.pack('Q', new_value))[0]
-    raise ValueError('Got an unusual decrypted value either nan, inf or sign '
-                     'bits aren\'t set correctly: %s' % hex(original_plaintext))
 
 
 def IsNan(x):

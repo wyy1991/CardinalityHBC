@@ -38,6 +38,15 @@ seed = '0123456789abcdef'
 paillier_obj = None
 
 
+
+def modpow(base, exponent, modulus):
+    result = 1
+    while exponent > 0:
+        if exponent & 1 == 1:
+            result = (result * base) % modulus
+        exponent = exponent >> 1
+        base = (base * base) % modulus
+    return result
 #--------Homo crypto-----------------------------------------------------
 def homo_generatePaillier(seed):
     return paillier.Paillier(seed)
@@ -53,10 +62,10 @@ def homo_add(paillierObj, ciphertext1, ciphertext2):
     return paillierObj.Add(ciphertext1, ciphertext2)
 def homo_mult(paillierObj, ciphertext, a):
     #Returns E(a*m) given E(m), a
-    return paillierObj.Affine(paillierObj, ciphertext, a, 0)
+    return  modpow(ciphertext, a, paillierObj.nsquare)
 def homo_affine(paillierObj, ciphertext, a, b):
     #Returns E(a*m + b) given E(m), a and b.
-    return  paillierObj.Affine(paillierObj, ciphertext, a, b)
+    return  paillierObj.Affine(ciphertext, a, b)
 def homo_encrypt_poly(paillierObj, f):
     # encrypt a f[]
     f_enc = []
@@ -694,14 +703,14 @@ def mainLoop():
                     for p in sum:
                         print homo_decrypt(paillier_obj,p )
                     
-                    print homo_decrypt(paillier_obj,homo_add(paillier_obj, 0,homo_encrypt(paillier_obj,2)))
+                    print homo_decrypt(paillier_obj,homo_add(paillier_obj, homo_encrypt(paillier_obj,0),homo_encrypt(paillier_obj,2)))
                     print 'E(2)x3=', homo_mult(paillier_obj,homo_encrypt(paillier_obj,3), 2)
-                    print homo_decrypt(paillier_obj,  homo_mult(paillier_obj, homo_encrypt(paillier_obj,1), -2))
-                    polya = np.poly1d([3,2,1])
-                    polyb = np.poly1d([3,2,1])
+                    print homo_decrypt(paillier_obj,  homo_mult(paillier_obj, homo_encrypt(paillier_obj,1), 2))
+                    polya = np.poly1d([3,-2,1])
+                    polyb = np.poly1d([3,2,-1])
                     print np.polymul(polya, polyb)
                     
-                    ppoly = homo_mult_poly(paillier_obj, [homo_encrypt(paillier_obj,3),homo_encrypt(paillier_obj,2),homo_encrypt(paillier_obj,1)], [3,2,1])
+                    ppoly = homo_mult_poly(paillier_obj, [homo_encrypt(paillier_obj,3),homo_encrypt(paillier_obj,-2),homo_encrypt(paillier_obj,1)], [3,2,-1])
                     for p in ppoly:
                         print homo_decrypt(paillier_obj,p )
                     
