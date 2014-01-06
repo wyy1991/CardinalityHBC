@@ -18,6 +18,7 @@ import paillier
 
 #-----Global variables-----------------------------------------------------
 netsocket = None
+socket_rcv_size = 1024 * 3
 peerDic = {}
 myNodeNum = 0
 firstNodeStatus = ''  # "WaitForPeers"  "StopAcceptingPeers" "StartComputing"
@@ -339,6 +340,8 @@ def createConnectFirstNodeMsg(originIP, originPort):
     msgDic = {'Origin':[originIP, originPort],
               'Join':1}
     msgStr=json.dumps(msgDic)
+    if sys.getsizeof(msgStr) > socket_rcv_size:
+        print "[Error] msg size too big!"
     return msgStr
 
 #--------createConnectFirstNodeMsg-----------------------------------------------------
@@ -346,6 +349,8 @@ def createRplyNodeNumMsg(n):
     msgDic = {'NodeNum':n,
               'OriginNum':1}
     msgStr=json.dumps(msgDic)
+    if sys.getsizeof(msgStr) > socket_rcv_size:
+        print "[Error] msg size too big!"
     return msgStr
 
 #--------createPolyMsg-----------------------------------------------------
@@ -355,6 +360,8 @@ def createPolyMsg(f,polytype, targetNum):
               'OriginNum':myNodeNum,
               'TargetNum':targetNum}
     msgStr=json.dumps(msgDic)
+    if sys.getsizeof(msgStr) > socket_rcv_size:
+        print "[Error] msg size too big!"
     return msgStr
 
 #--------createPeerListMsg-----------------------------------------------------
@@ -365,6 +372,8 @@ def createPeerListMsg():
               'Paillier':paillier_list,
               'OriginNum':1}
     msgStr=json.dumps(msgDic)
+    if sys.getsizeof(msgStr) > socket_rcv_size:
+        print "[Error] msg size too big!"
     return msgStr
 
 #--------createRplyMsg(replyText)-----------------------------------------------------
@@ -373,6 +382,8 @@ def createRplyMsg(replyText, targetNum):
               'TargetNum':targetNum,
               'OriginNum':myNodeNum}
     msgStr=json.dumps(msgDic)
+    if sys.getsizeof(msgStr) > socket_rcv_size:
+        print "[Error] msg size too big!"
     return msgStr
 
 #--------createFiyMsg(replyText)-----------------------------------------------------
@@ -381,6 +392,8 @@ def createFiMsg(fi_enc, target):
               'TargetNum':target,
               'OriginNum':myNodeNum}
     msgStr=json.dumps(msgDic)
+    if sys.getsizeof(msgStr) > socket_rcv_size:
+        print "[Error] msg size too big!"
     return msgStr
 
 
@@ -390,6 +403,8 @@ def createCommandMsg(command,origin,target):
               'TargetNum':target,
               'OriginNum':origin}
     msgStr=json.dumps(msgDic)
+    if sys.getsizeof(msgStr) > socket_rcv_size:
+        print "[Error] msg size too big!"
     return msgStr
 
 #--------processJoinMsg-----------------------------------------------------
@@ -442,9 +457,10 @@ def processPeerListMsg(msgdict):
     if msgdict['OriginNum']!=1:
         return
     pail = msgdict['Paillier']
+    
   
     
-    paillier_obj = paillier.Paillier(None, paillier[0],paillier[1] , paillier[3], paillier[4])
+    paillier_obj = paillier.Paillier(None, pail[0],pail[1] , pail[3], pail[4])
 
     print "Updated paillier"
     newPeerDic = msgdict['PeerList']
@@ -566,6 +582,7 @@ def processPolyMsg(msgdict):
 #--------processPendingMsg-----------------------------------------------------    
 def processPendingMsg(rawmsg, origin_addr):
     print "received from address", origin_addr
+    print "rawsmsg_size",sys.getsizeof(rawmsg),"rawmsg:", rawmsg
     msgdict = json.loads(str(rawmsg))  # @@@ json to dictionary
     
     if 'Join' in msgdict:
@@ -601,7 +618,7 @@ def mainLoop():
     # loop through sockets
     input = [netsocket,sys.stdin]
     running = True
-    size = 1024
+
     print "waiting in main loop..."
     while running:
         inputready,outputready,exceptready = select.select(input,[],[])
@@ -611,7 +628,7 @@ def mainLoop():
             if s == netsocket:
                 # handle the netsocket socket
                 try:
-                    data,address = netsocket.recvfrom(size)
+                    data,address = netsocket.recvfrom(socket_rcv_size)
                     #print "received" + data
                     # got pending msg
                     processPendingMsg(data, address)
@@ -635,22 +652,26 @@ def mainLoop():
                     # generate paillier object
                     initPaillierObject()
                     print "Paillier Object:"
+                    '''
                     print 'g = ', paillier_obj.g
                     print 'n = ', paillier_obj.n
                     print 'nsquare = ', paillier_obj.nsquare
                     print '__lambda = ', paillier_obj.getLambda()
                     print '__mu = ', paillier_obj.getMu()
+                    '''
          
                     #@@@ testcode
-                    '''
+                    
                     print "------test--------"
-                         
+                    
+                    print 'size = ', sys.getsizeof(homo_encrypt(paillier_obj, -17))
+                    
                     test_list2 =   [  125,  684, 1, 0 ]
                     print "test list2:", test_list2
                     for test_index in range(0, len(test_list2)):
                         try:
-                            enc = homo_encrypt(pk, int(test_list2[test_index]))
-                            print test_list2[test_index], ":",enc, ":",homo_decrypt(sk, pk,enc)
+                            enc = homo_encrypt(paillier_obj, int(test_list2[test_index]))
+                            print test_list2[test_index], ":",enc, ":",homo_decrypt(paillier_obj,enc)
                         except:
                             print "error"
                     
@@ -659,41 +680,40 @@ def mainLoop():
                     for test_index in range(0, len(test_list1)):
                         # create socket
                         try:
-                            enc = homo_encrypt(pk, int(test_list1[test_index]))
-                            print test_list1[test_index], ":", enc, ":",homo_decrypt(sk, pk,enc)
+                            enc = homo_encrypt(paillier_obj, int(test_list1[test_index]))
+                            print test_list1[test_index], ":", enc, ":",homo_decrypt(paillier_obj, enc)
                    
                         #print newsocket.getsockname()
                         except:
                             print "error"
-                    print "homo_enc_poly:",homo_encrypt_poly(pk, test_list1)
+                    print "homo_enc_poly:",homo_encrypt_poly(paillier_obj, test_list1)
                     
-                    '''
-                    '''
-                    sum = homo_add_poly([homo_encrypt(pk,4),homo_encrypt(pk,3),homo_encrypt(pk,2),homo_encrypt(pk,1)], [homo_encrypt(pk,2),homo_encrypt(pk,1)])
+                    
+                    sum = homo_add_poly(paillier_obj,[homo_encrypt(paillier_obj,4),homo_encrypt(paillier_obj,3),homo_encrypt(paillier_obj,2),homo_encrypt(paillier_obj,1)], [homo_encrypt(paillier_obj,2),homo_encrypt(paillier_obj,1)])
                     print "sum = "
                     for p in sum:
-                        print homo_decrypt(sk, pk,p )
+                        print homo_decrypt(paillier_obj,p )
                     
-                    print homo_decrypt(sk, pk,homo_add(pk, 0,homo_encrypt(pk,2)))
-                    print 'E(2)x3=', homo_mult(pk, homo_encrypt(pk,3), 2)
-                    print homo_decrypt(sk, pk,  homo_mult(pk, homo_encrypt(pk,1), -2))
+                    print homo_decrypt(paillier_obj,homo_add(paillier_obj, 0,homo_encrypt(paillier_obj,2)))
+                    print 'E(2)x3=', homo_mult(paillier_obj,homo_encrypt(paillier_obj,3), 2)
+                    print homo_decrypt(paillier_obj,  homo_mult(paillier_obj, homo_encrypt(paillier_obj,1), -2))
                     polya = np.poly1d([3,2,1])
                     polyb = np.poly1d([3,2,1])
                     print np.polymul(polya, polyb)
                     
-                    ppoly = homo_mult_poly(pk, [homo_encrypt(pk,3),homo_encrypt(pk,2),homo_encrypt(pk,1)], [3,2,1])
+                    ppoly = homo_mult_poly(paillier_obj, [homo_encrypt(paillier_obj,3),homo_encrypt(paillier_obj,2),homo_encrypt(paillier_obj,1)], [3,2,1])
                     for p in ppoly:
-                        print homo_decrypt(sk, pk,p )
-                        '''
-                    '''
+                        print homo_decrypt(paillier_obj,p )
+                    
+                    
                     print "----------------"
-                    '''
+                  
                     
                     broadcastPeerListandKeys()
                     
 
                 else:
-                    #netsocket.sendto(textin,(host,port)) 
+                    #netsocket.sendto(textin,(host,port)) q
                     running = True
                 
     # close netsocket socket
