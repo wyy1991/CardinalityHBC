@@ -33,38 +33,36 @@ n_hbc = 0 # n>2 number of hbc
 c_collude = 2 # c<n, dishonesty colluding peers
 k_set_size = 4 # set size
 s_set = list() #local set
-sk = None # private key
-pk = None # public key
+seed = '0123456789abcdef'
+paillier_obj = None
 
 
 #--------Homo crypto-----------------------------------------------------
-def homo_generateKeyPair(numOfBits):
-    priv, pub = paillier.generate_keypair(numOfBits)
-    return priv, pub
-def homo_encrypt(pub,plain):
+def homo_generatePaillier(seed):
+    return paillier.Paillier(seed)
+def homo_encrypt(paillierObj,plain):
     try:
-        return paillier.encrypt(pub, plain)
+        return paillierObj.EncryptInt64(plain)
     except:
-        return 0
-def homo_decrypt(priv, pub, cipher):
-    return paillier.decrypt(priv, pub, cipher)
-def homo_add(pub, cipher_a, cipher_b):
+        print "homo_encrypt error!"
+def homo_decrypt(paillierObj, cipher):
+    return paillierObj.DecryptInt64(cipher)
+def homo_add(paillierObj, ciphertext1, ciphertext2):
     #returns E(m1 + m2) given E(m1) and E(m2).
-    return paillier.e_add(pub, cipher_a, cipher_b)
-def homo_mult(pub, ciphertext, n):
+    return paillierObj.Add(ciphertext1, ciphertext2)
+def homo_mult(paillierObj, ciphertext, a):
     #Returns E(a*m) given E(m), a
-    return paillier.e_mul_const(pub, ciphertext, n)
-def homo_affine(pub, ciphertext, a, b):
+    return paillierObj.Affine(paillierObj, ciphertext, a, 0)
+def homo_affine(paillierObj, ciphertext, a, b):
     #Returns E(a*m + b) given E(m), a and b.
-    a_mult_ciphertext = pow(ciphertext, a, pub.n_sq)
-    return a_mult_ciphertext * pow(pub.g, b, pub.n_sq) % pub.n_sq
-def homo_encrypt_poly(pub, f):
+    return  paillierObj.Affine(paillierObj, ciphertext, a, b)
+def homo_encrypt_poly(paillierObj, f):
     # encrypt a f[]
     f_enc = []
     for val in range(0,len(f)):
-        f_enc.append(homo_encrypt(pub,f[val]))
+        f_enc.append(homo_encrypt(paillierObj, f[val]))
     return f_enc
-def homo_add_poly(f1, f2):
+def homo_add_poly(paillierObj, f1, f2):
     # return E(g[i]) = E(f1) + E(f2)
     g = []
     degf1 = len(f1)-1
@@ -75,13 +73,13 @@ def homo_add_poly(f1, f2):
             g.append(0)
         deg_g = len(g)-1
         for i in range(0,degf1+1):
-            g[i]= homo_add(pk, f1[i], f2[i])
+            g[i]= homo_add(paillierObj, f1[i], f2[i])
     if degf1 > degf2:
         for i in range(0,degf1+1):
             g.append(0)
         deg_g = len(g)-1
         for i in range(0,degf2+1):
-            g[deg_g-i]=homo_add(pk,f1[degf1-i],f2[degf2-i])
+            g[deg_g-i]=homo_add(paillierObj,f1[degf1-i],f2[degf2-i])
         for i in range(degf2+1,degf1+1):
             g[deg_g-i]=f1[degf1-i]
     if degf1 < degf2:
@@ -89,11 +87,11 @@ def homo_add_poly(f1, f2):
             g.append(0)
         deg_g = len(g)-1
         for i in range(0,degf1+1):
-            g[deg_g-i]=homo_add(pk,f1[degf1-i],f2[degf2-i])
+            g[deg_g-i]=homo_add(paillierObj,f1[degf1-i],f2[degf2-i])
         for i in range(degf1+1,degf2+1):
             g[deg_g-i]=f2[degf2-i]
     return g
-def homo_mult_poly(pub, f1_enc, f2):
+def homo_mult_poly(paillierObj, f1_enc, f2):
     g=[]
     deg_f1 = len(f1_enc)-1
     deg_f2 = len(f2)-1
@@ -105,35 +103,33 @@ def homo_mult_poly(pub, f1_enc, f2):
             if deg_f1-(bigi-i) < 0 or deg_f2-i < 0:
                 e_mult = 0
             else:
-                e_mult = homo_mult(pub, f1_enc[deg_f1-(bigi-i)], f2[deg_f2-i])
+                e_mult = homo_mult(paillierObj, f1_enc[deg_f1-(bigi-i)], f2[deg_f2-i])
             if 0==g[deg_g - bigi]:
                 g[deg_g - bigi] = e_mult
             elif 0!=e_mult:
-                g[deg_g - bigi] = homo_add(pub, g[deg_g - bigi], e_mult)
+                g[deg_g - bigi] = homo_add(paillierObj, g[deg_g - bigi], e_mult)
     return g
 
 
-def homo_evalutate(pub, f1_enc, b):
+def homo_evalutate(paillierObj, f1_enc, b):
     # return E(a) = fi_enc plug in b
     a_enc = 0
     deg_f1 = len(f1_enc)-1
     for k in range (0, deg_f1+1):
         bpower = b**k
-        tmp = homo_mult(pk, f1_enc[deg_f1 - k], bpower)
+        tmp = homo_mult(paillierObj, f1_enc[deg_f1 - k], bpower)
         if a_enc == 0:
             a_enc = tmp
         else:
-            a_enc = homo_add(pub, a_enc, tmp)
+            a_enc = homo_add(paillierObj, a_enc, tmp)
     return a_enc
-#--------broadcastPeerList-----------------------------------------------------
-def generateKeyPair():    
-    global sk
-    global pk
+
+
+#--------initPaillierObject-----------------------------------------------------
+def initPaillierObject():
+    global paillier_obj
     if myNodeNum == 1:
-        priv, pub = homo_generateKeyPair(128)
-        sk = priv
-        pk = pub
-        
+        paillier_obj = homo_generatePaillier(seed)
 
 #--------read in file-----------------------------------------------------
 def readInFile(nodeNum):
@@ -158,7 +154,7 @@ def stepOne_ab():
     fi = np.poly1d(s_set,True).c
     print "fi:",fi
     # encrypt fi
-    fi_enc = homo_encrypt_poly(pk, fi)
+    fi_enc = homo_encrypt_poly(paillier_obj, fi)
     fi_enc_dic[myNodeNum]= fi_enc   # store into fi_enc_dic
     #print "fi_enc:", fi_enc
     # create new message fi
@@ -199,8 +195,8 @@ def stepOne_cd():
         f_tmp = fi_enc_dic[index]
         r_tmp = r_set[index]
         #@@@ now 
-        fxr_tmp = homo_mult_poly(pk,f_tmp, r_tmp)
-        theta_coef = homo_add_poly(fxr_tmp, theta_coef)
+        fxr_tmp = homo_mult_poly(paillier_obj,f_tmp, r_tmp)
+        theta_coef = homo_add_poly(paillier_obj, fxr_tmp, theta_coef)
     theta = theta_coef
     #print "theta = ", theta
     print "calculated my theta"
@@ -247,10 +243,10 @@ def stepFive_ab(lambda_n):
         vij_dec_list.append(0)
     # compute cij, by eacluating lambda_n
     for j in range(0, k_set_size):
-        cij_list[j]= homo_evalutate(pk, lambda_n, s_set[j])
+        cij_list[j]= homo_evalutate(paillier_obj, lambda_n, s_set[j])
     
     for j in range(0, k_set_size):
-        cij_dec_list[j] = homo_decrypt(sk, pk, cij_list[j])
+        cij_dec_list[j] = homo_decrypt(paillier_obj, cij_list[j])
     print 'cij_dec_list:', cij_dec_list
     
     # for j = 1 to k, choose rij <- R, 
@@ -258,12 +254,12 @@ def stepFive_ab(lambda_n):
     
     for j in range (0, k_set_size):
         r_rand=num = randint(1,100)
-        vij_list[j] = homo_mult(pk, cij_list[j], r_rand)
+        vij_list[j] = homo_mult(paillier_obj, cij_list[j], r_rand)
     print 'vij_list:',vij_list
     
     for j in range (0, k_set_size):
         '''for test'''
-        vij_dec_list[j] = homo_decrypt(sk, pk, vij_list[j])
+        vij_dec_list[j] = homo_decrypt(paillier_obj, vij_list[j])
         
     print "vij_dec_list:", vij_dec_list
     
@@ -363,12 +359,10 @@ def createPolyMsg(f,polytype, targetNum):
 
 #--------createPeerListMsg-----------------------------------------------------
 def createPeerListMsg():
-    skey = [sk.l, sk.m]
-    pkey = [pk.n, pk.n_sq, pk.g]
+    paillier_list = [paillier_obj.g, paillier_obj.n, paillier_obj.nsquare, paillier_obj.getLambda(), paillier_obj.getMu()]
     
     msgDic = {'PeerList':peerDic,
-              'SKey':skey,
-              'PKey':pkey,
+              'Paillier':paillier_list,
               'OriginNum':1}
     msgStr=json.dumps(msgDic)
     return msgStr
@@ -438,8 +432,7 @@ def processRplyNodeNumMsg(msgdict):
 def processPeerListMsg(msgdict):
     global peerDic
     global myNodeNum
-    global sk
-    global pk
+    global paillier_obj
     global n_hbc
     
     # update my address at 0
@@ -448,17 +441,12 @@ def processPeerListMsg(msgdict):
         return
     if msgdict['OriginNum']!=1:
         return
-    skey = msgdict['SKey']
-    pkey = msgdict['PKey']
+    pail = msgdict['Paillier']
+  
     
-    sk = paillier.PrivateKey()
-    pk = paillier.PublicKey()
-    sk.l = skey[0]
-    sk.m = skey[1]
-    pk.n = pkey[0]
-    pk.n_sq = pkey[1]
-    pk.g = pkey[2] 
-    print "Updated sk pk"
+    paillier_obj = paillier.Paillier(None, paillier[0],paillier[1] , paillier[3], paillier[4])
+
+    print "Updated paillier"
     newPeerDic = msgdict['PeerList']
     for num, addr in newPeerDic.items():
         if int(num) != 0 and int(num) != 1:
@@ -551,7 +539,7 @@ def processPolyMsg(msgdict):
     if polytype == 'Lambda' and targetNum == myNodeNum and originNum == myNodeNum-1 and myNodeNum != 1:
         lambda_other = poly
         #lambda = lambda other + theta  (encrypted)
-        lambda_my = homo_add_poly(lambda_other, theta)
+        lambda_my = homo_add_poly(paillier_obj, lambda_other, theta)
         #send the encryption to  player i+1 mod n
         print "myNodeNum = ",myNodeNum,"n_hbc = ",n_hbc 
         tar = (myNodeNum + 1)
@@ -584,7 +572,7 @@ def processPendingMsg(rawmsg, origin_addr):
         processJoinMsg(origin_addr)
     if 'NodeNum' in msgdict and 'OriginNum' in msgdict:
         processRplyNodeNumMsg(msgdict)
-    if 'PeerList' in msgdict and 'OriginNum' in msgdict and 'SKey' in msgdict and'PKey' in msgdict:
+    if 'PeerList' in msgdict and 'OriginNum' in msgdict and 'Paillier' in msgdict:
         processPeerListMsg(msgdict)
     if 'TargetNum' in msgdict and 'OriginNum' in msgdict and 'Reply' in msgdict:
         processReplyMsg(msgdict, origin_addr)
@@ -644,8 +632,15 @@ def mainLoop():
                     firstNodeStatus = "StopAcceptingPeers"
                     print "Stop accepting new peers."
                     n_hbc = len(peerDic) - 1
-                    generateKeyPair()
-                    print "sk=",sk,"pk=",pk
+                    # generate paillier object
+                    initPaillierObject()
+                    print "Paillier Object:"
+                    print 'g = ', paillier_obj.g
+                    print 'n = ', paillier_obj.n
+                    print 'nsquare = ', paillier_obj.nsquare
+                    print '__lambda = ', paillier_obj.getLambda()
+                    print '__mu = ', paillier_obj.getMu()
+         
                     #@@@ testcode
                     '''
                     print "------test--------"
