@@ -262,16 +262,17 @@ def stepFive_ab(lambda_n):
     # for j = 1 to k, choose rij <- R, 
     # evaluate (Vi)j = rijxh E(cij)
     
+    '''
     for j in range (0, k_set_size):
         r_rand=num = randint(1,100)
         vij_list[j] = homo_mult(paillier_obj, cij_list[j], r_rand)
     print 'vij_list:',vij_list
     
     for j in range (0, k_set_size):
-        '''for test'''
         vij_dec_list[j] = homo_decrypt(paillier_obj, vij_list[j])
         
     print "vij_dec_list:", vij_dec_list
+    '''
     
     #send reply to node 1
     rply_vset_msg = createRplyMsg('Got_Vset', 1)
